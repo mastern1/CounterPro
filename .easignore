@@ -1,0 +1,14 @@
+node_modules/
+.git/
+.expo/
+.expo-shared/
+web-build/
+dist/
+build/
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
+*.apk
+*.aab
+.vscode

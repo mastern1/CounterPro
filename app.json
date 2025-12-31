@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "CounterFinal",
-    "slug": "CounterFinal",
+    "name": "CounterPro",
+    "slug": "CounterPro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "counterfinal",
+    "scheme": "counterpro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.noursweid98.Counterpro"
+      "package": "com.noursweid98.counterpro"
     },
     "web": {
       "output": "static",
@@ -45,10 +45,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "masternur22",
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0c2b1c4a-20ff-490e-b6db-5a7d072b83ff"
+        "projectId": "ba49fe38-6e0d-4790-90e1-2e330b3903a0"
       }
     }
   }
