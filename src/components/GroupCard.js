@@ -1,5 +1,4 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const GroupCard = ({ 
   item,       // بيانات المجموعة
@@ -24,7 +23,7 @@ const GroupCard = ({
             {item.groupName}
           </Text>
           <Text style={styles.subText}>
-            {item.items?.length || 0} عدادات • {new Date(parseInt(item.id)).toLocaleDateString('ar-EG')}
+            {item.items?.length || 0} Counters • {new Date(parseInt(item.id)).toLocaleDateString('en-US')}
           </Text>
         </View>
 

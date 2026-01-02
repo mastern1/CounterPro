@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, StyleSheet, Text, TouchableOpacity, useWindowDimensions, Vibration, View } from 'react-native';
-// 👇 استيراد ملف النصوص (تأكد من صحة المسار)
+import { Alert, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
+// 👇 استيراد ملف النصوص
 import { TEXTS as appStrings } from '../constants/translations';
 
 const CounterCard = ({ 
@@ -10,18 +10,13 @@ const CounterCard = ({
   onReset, 
   onEdit, 
   onDelete, 
+  cardWidth, // 👈 التغيير الوحيد: استقبلنا العرض كـ prop من الأب
   containerStyle 
 }) => {
   
-  // 📐 1. المعادلة الذكية (Smart Width Equation)
-  // لا نسب مئوية بعد اليوم! الحساب بالبكسل.
-  const { width } = useWindowDimensions();
-  const numColumns = width > 600 ? 4 : 2; // 4 للتابلت، 2 للموبايل
-  const marginPerCard = 12; // (Margin 6 Left + Margin 6 Right)
-  const containerPadding = 24; // (Padding 12 Container Left + 12 Right)
-  
-  // العرض = (عرض الشاشة - حواف الحاوية) ÷ عدد الأعمدة - حواف الكرت
-  const cardWidth = ((width - containerPadding) / numColumns) - marginPerCard;
+  // ❌ قمنا بحذف "المعادلة الذكية" من هنا
+  // السبب: الآن الصفحة الرئيسية (Dashboard) هي التي تقرر العرض
+  // إذا كانت "قائمة" سترسل عرض كبير، وإذا "شبكة" سترسل عرض صغير.
 
   const handleIncrement = () => {
     const stepValue = item.step || 1;
@@ -38,7 +33,6 @@ const CounterCard = ({
   };
 
   const handleDeleteConfirm = () => {
-    // 👇 استخدام النصوص من الملف المنفصل
     Alert.alert(
       appStrings.deleteTitle,
       appStrings.deleteMessage(item.name),
@@ -52,6 +46,7 @@ const CounterCard = ({
   const buttonText = `+${item.step || 1}`;
 
   return (
+    // 👇 هنا يتم تطبيق العرض القادم من الخارج
     <View style={[styles.card, { width: cardWidth }, containerStyle]}>
       
       {/* 1. القمة: أزرار التحكم */}
@@ -112,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    margin: 6, // متوافق مع المعادلة (6+6=12)
+    margin: 6, 
     alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

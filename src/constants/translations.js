@@ -28,6 +28,9 @@ const textDatabase = {
     deleteGroupMsg: "Are you sure? All counters inside will be deleted.",
     deleteBtn: "Delete", // مستخدم في Home
     editFeature: "Coming Soon...",
+    logOutBtn: "Logout",
+    logOutTitle: "Logout Confirmation",
+    logOutMsg: "Are you sure you want to logout?, all unsynced data may be lost.",
 
     // --- Dashboard Screen ---
     itemsTitle: "Dashboard",
