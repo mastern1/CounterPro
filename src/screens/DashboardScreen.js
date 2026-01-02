@@ -1,10 +1,10 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, useWindowDimensions, FlatList, TouchableOpacity, Alert, Modal, TextInput, StyleSheet, LayoutAnimation, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useContext, useState } from 'react';
+import { Alert, FlatList, LayoutAnimation, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons'; 
 import CounterCard from '../components/CounterCard';
-import { ProjectContext } from '../context/ProjectContext';
 import { TEXTS } from '../constants/translations';
+import { ProjectContext } from '../context/ProjectContext';
 
 export default function DashboardScreen({ route, navigation }) {
   const { groupId, groupName, workerName, deviceId } = route?.params || {}; 
@@ -24,6 +24,8 @@ export default function DashboardScreen({ route, navigation }) {
 
   const addItem = () => {
     if (!newItemName.trim()) { Alert.alert(TEXTS.alertError, "Name is required"); return; }
+    const nameExists = items.some(i => i.name.trim().toLowerCase() === newItemName.trim().toLowerCase());
+    if (nameExists) {Alert.alert(TEXTS.alertError,"This item name already exists!"); return;}
     const newItem = { id: Date.now().toString(), name: newItemName, count: 0, step: parseInt(newItemStep) || 1 };
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const updatedList = [...items, newItem];
@@ -54,16 +56,13 @@ export default function DashboardScreen({ route, navigation }) {
   };
   
   const handleDelete = (itemId) => {
-    Alert.alert(TEXTS.deleteItemTitle, TEXTS.deleteItemMsg, [
-      { text: TEXTS.cancelBtn, style: "cancel" },
-      { text: TEXTS.deleteBtn, style: "destructive", onPress: () => {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          const filteredList = items.filter(i => i.id !== itemId);
-          saveChanges(filteredList);
-        } 
-      }
-    ]);
-  };
+    // 1. أنيميشن للحذف السلس (مهم جداً للجمالية)
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    // 2. الحذف المباشر (لأن المستخدم وافق بالفعل داخل الكرت)
+    const filteredList = items.filter(i => i.id !== itemId);
+    saveChanges(filteredList);
+};
 
   const columns = width > 500 ? 4 : 2;
 

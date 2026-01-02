@@ -1,9 +1,9 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import { useContext, useState } from 'react';
+import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import GroupCard from '../components/GroupCard';
-import { ProjectContext } from '../context/ProjectContext';
 import { TEXTS } from '../constants/translations';
+import { ProjectContext } from '../context/ProjectContext';
 
 const HomeScreen = ({ navigation, route }) => {
   const { workerName, deviceId } = route.params || {};
@@ -24,6 +24,8 @@ const HomeScreen = ({ navigation, route }) => {
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) return;
+        const nameExists = groups.some(i => i.groupName.trim().toLowerCase() === newGroupName.trim().toLowerCase());
+            if (nameExists) {Alert.alert(TEXTS.alertError,"This group name already exists!"); return;}
     addNewGroup(newGroupName, workerName, deviceId);
     setNewGroupName('');
     setModalVisible(false);

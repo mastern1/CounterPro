@@ -1,70 +1,188 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Alert, StyleSheet, Text, TouchableOpacity, useWindowDimensions, Vibration, View } from 'react-native';
+// 👇 استيراد ملف النصوص (تأكد من صحة المسار)
+import { TEXTS as appStrings } from '../constants/translations';
 
-// 1. استلام cardWidth كخاصية (Prop)
-export default function CounterCard({ 
+const CounterCard = ({ 
   item, 
-  cardWidth, 
   onIncrement, 
   onDecrement, 
-  onDelete,
-  onReset,
-  onEdit 
-}) {
+  onReset, 
+  onEdit, 
+  onDelete, 
+  containerStyle 
+}) => {
+  
+  // 📐 1. المعادلة الذكية (Smart Width Equation)
+  // لا نسب مئوية بعد اليوم! الحساب بالبكسل.
+  const { width } = useWindowDimensions();
+  const numColumns = width > 600 ? 4 : 2; // 4 للتابلت، 2 للموبايل
+  const marginPerCard = 12; // (Margin 6 Left + Margin 6 Right)
+  const containerPadding = 24; // (Padding 12 Container Left + 12 Right)
+  
+  // العرض = (عرض الشاشة - حواف الحاوية) ÷ عدد الأعمدة - حواف الكرت
+  const cardWidth = ((width - containerPadding) / numColumns) - marginPerCard;
+
+  const handleIncrement = () => {
+    const stepValue = item.step || 1;
+    const nextValue = item.count + stepValue;
+    const targetValue = parseInt(item.target || 0);
+
+    // اهتزاز الهدف
+    if (targetValue > 0 && nextValue >= targetValue) {
+      Vibration.vibrate([0, 400]); 
+    } else {
+      Vibration.vibrate(10);
+    }
+    onIncrement(item.id);
+  };
+
+  const handleDeleteConfirm = () => {
+    // 👇 استخدام النصوص من الملف المنفصل
+    Alert.alert(
+      appStrings.deleteTitle,
+      appStrings.deleteMessage(item.name),
+      [
+        { text: appStrings.cancelBtn, style: "cancel" },
+        { text: appStrings.deleteBtn, style: "destructive", onPress: () => onDelete(item.id) }
+      ]
+    );
+  };
+
+  const buttonText = `+${item.step || 1}`;
+
   return (
-    // 2. دمج الستايل الثابت مع العرض الديناميكي المتغير
-    <View style={[styles.card, { width: cardWidth }]}>
+    <View style={[styles.card, { width: cardWidth }, containerStyle]}>
       
-      <View style={styles.topRow}>
-        <TouchableOpacity onPress={onReset} style={styles.iconBtn}>
-          <Text style={[styles.iconText, { color: '#fb8c00' }]}>↺</Text> 
+      {/* 1. القمة: أزرار التحكم */}
+      <View style={styles.topIconsRow}>
+        <TouchableOpacity onPress={() => onEdit(item)} style={styles.iconButton}>
+          <Ionicons name="pencil" size={16} color="#999" />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={onEdit} style={styles.iconBtn}>
-          <Text style={[styles.iconText, { color: '#1e88e5' }]}>✎</Text>
+        <TouchableOpacity onPress={handleDeleteConfirm} style={styles.iconButton}>
+          <Ionicons name="trash-outline" size={16} color="#999" />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => onReset(item.id)} style={styles.iconButton}>
+          <Ionicons name="refresh" size={16} color="#999" />
+        </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity onPress={onDelete} style={styles.iconBtn}>
-          <Text style={[styles.iconText, { color: '#e53935' }]}>✕</Text>
+      {/* 2. اسم العداد */}
+      <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
+
+      {/* 3. المنطقة الوسطى (الهرمية) */}
+      <View style={styles.centerSection}>
+        <Text style={styles.countText} adjustsFontSizeToFit numberOfLines={1}>
+          {item.count}
+        </Text>
+        
+        {/* عرض الهدف */}
+        {item.target > 0 && (
+           <Text style={[styles.goalText, { color: item.count >= item.target ? '#4CAF50' : '#AAA' }]}>
+             {appStrings.goal}: {item.target}
+           </Text>
+        )}
+
+        {/* زر الناقص تحت الرقم */}
+        <TouchableOpacity 
+          style={styles.minusButtonBelow} 
+          onPress={() => onDecrement(item.id)}
+          hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+        >
+          <Ionicons name="remove" size={20} color="#CCC" />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-
-      <View style={styles.countContainer}>
-        <Text style={styles.countText}>{item.count}</Text>
-      </View>
-
-      <View style={styles.controls}>
-        <TouchableOpacity style={styles.actionButton} onPress={onDecrement}>
-          <Text style={styles.actionText}>-</Text>
-        </TouchableOpacity>
-
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepText}>+{item.step}</Text>
-        </View>
-
-        <TouchableOpacity style={[styles.actionButton, styles.incrementButton]} onPress={onIncrement}>
-          <Text style={[styles.actionText, { color: '#fff' }]}>+</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 4. الزر السفلي */}
+      <TouchableOpacity 
+        style={[styles.incrementButton, { backgroundColor: item.color || '#1A73E8' }]} 
+        onPress={handleIncrement}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.incrementText}>{buttonText}</Text> 
+      </TouchableOpacity>
+      
     </View>
   );
-}
+};
 
-// الستايلات ثابتة هنا (بدون العرض لأنه متغير)
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#fff', borderRadius: 18, padding: 12, margin: 8, elevation: 4, alignItems: 'center' },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 5 },
-  iconBtn: { padding: 5 },
-  iconText: { fontSize: 20, fontWeight: 'bold' },
-  itemName: { fontSize: 14, fontWeight: '600', color: '#444' },
-  countContainer: { marginVertical: 5 },
-  countText: { fontSize: 32, fontWeight: '900', color: '#1a237e' },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
-  actionButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f2f5', justifyContent: 'center', alignItems: 'center' },
-  incrementButton: { backgroundColor: '#1a237e' },
-  actionText: { fontSize: 22, fontWeight: 'bold', color: '#1a237e' },
-  stepBadge: { backgroundColor: '#e8eaf6', paddingHorizontal: 6, borderRadius: 8 },
-  stepText: { fontSize: 11, fontWeight: 'bold', color: '#1a237e' },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    margin: 6, // متوافق مع المعادلة (6+6=12)
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    justifyContent: 'space-between',
+    minHeight: 190,
+  },
+  topIconsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 8,
+    width: '100%',
+  },
+  iconButton: {
+    padding: 4,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  centerSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    width: '100%',
+    marginBottom: 8,
+  },
+  countText: {
+    fontSize: 56,
+    fontWeight: 'bold',
+    color: '#000',
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  goalText: {
+    fontSize: 10,
+    marginTop: -2,
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  minusButtonBelow: {
+    marginTop: 4,
+    padding: 6,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+  },
+  incrementButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 'auto',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  incrementText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
 });
+
+export default CounterCard;
