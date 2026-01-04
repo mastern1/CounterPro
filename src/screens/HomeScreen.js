@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons'; // ✅ استيراد الأيقونات
 import { useContext, useState } from 'react';
-import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import GroupCard from '../components/GroupCard';
+import InputModal from '../components/InputModal';
+import { COLORS } from '../constants/colors';
 import { TEXTS } from '../constants/translations';
 import { ProjectContext } from '../context/ProjectContext';
+import { checkDuplicateName } from '../utils/validation';
 
 const HomeScreen = ({ navigation }) => {
   // ❌ لم نعد بحاجة لقراءة route.params
@@ -12,7 +15,6 @@ const HomeScreen = ({ navigation }) => {
   const { groups, addNewGroup, deleteGroup, userData, logoutUser, editGroup } = useContext(ProjectContext);
   
   const [modalVisible, setModalVisible] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
   const [editingGroupId, setEditingGroupId] = useState(null);
 
   // حساب إجمالي العدادات
@@ -24,47 +26,29 @@ const HomeScreen = ({ navigation }) => {
   const handlePressGroup = (group) => {
     navigation.navigate('Dashboard', { 
       groupId: group.id, 
-      groupName: group.groupName 
+      groupName: group.name
       // لم نعد بحاجة لتمرير workerName لأن الداش بورد يقرأه من الكونتكست أيضاً
     });
   };
 
-  /*const handleAddGroup = () => {
-    if (!newGroupName.trim()) return;
-    const nameExists = groups.some(i => i.groupName.trim().toLowerCase() === newGroupName.trim().toLowerCase());
-    if (nameExists) {
-        Alert.alert(TEXTS.alertError, "This group name already exists!"); 
-        return;
-    }
-    addNewGroup(newGroupName);
-    setNewGroupName('');
-    setModalVisible(false);
-  };
-  const handleEditGroup = (id) => {
-    setModalVisible(true);
-    setEditingGroupId(id);
-    return;
-  };*/
 
-  const handleUpdatedGroup = () => {
-    const trimmedName = newGroupName.trim();
-    if (!trimmedName){
-      Alert.alert(TEXTS.alertError, "Group name cannot be empty!");
+
+  const handleUpdatedGroup = (data) => {
+    const {name} = data;
+   
+    const duplicateName = checkDuplicateName(name, groups, editingGroupId);
+    if (duplicateName) {
+      Alert.alert(TEXTS.alertError, "This group name already exists!");
       return;
     }
-     const nameExists = groups.some(i => i.groupName.trim().toLowerCase() === trimmedName.toLowerCase() && 
-     i.id !== editingGroupId);
-    if (nameExists) {
-        Alert.alert(TEXTS.alertError, "This group name already exists!"); 
-        return;
-  }
+
+    const trimmedName = name.trim();
+
   if (editingGroupId === null) {
     addNewGroup(trimmedName);
   } else {
     editGroup(editingGroupId, trimmedName);
-    setEditingGroupId(null);
   }
-    setNewGroupName('');
     setModalVisible(false);
     setEditingGroupId(null);
   };
@@ -152,7 +136,9 @@ const HomeScreen = ({ navigation }) => {
           <GroupCard 
             item={item}
             onPress={() => handlePressGroup(item)}
-            onEdit={() => {setEditingGroupId(item.id); setNewGroupName(item.groupName); setModalVisible(true);}}
+            onEdit={() => {
+              setEditingGroupId(item.id);
+               setModalVisible(true);}}
             onExport={() => Alert.alert(TEXTS.alertError, TEXTS.editFeature)}
             onDelete={() => handleDeleteGroup(item.id)}
           />
@@ -170,31 +156,29 @@ const HomeScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       {/* --- MODAL --- */}
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{!editingGroupId ? TEXTS.newGroupTitle : "Edit current group"}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={TEXTS.newGroupPlaceholder}
-              value={newGroupName}
-              onChangeText={setNewGroupName}
-              autoFocus={true}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => {setModalVisible(false); setEditingGroupId(null); setNewGroupName('');}}>
-                <Text>{TEXTS.cancelBtn}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleUpdatedGroup}>
-                <Text style={{color: '#fff', fontWeight: 'bold'}}>{!editingGroupId ? TEXTS.newGroupBtn : "Edit"}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
-  );
-};
+      {/* 👇 المكون الجديد: سطر واحد يقوم بكل العمل */}
+<InputModal 
+  visible={modalVisible}
+  onClose={() => {
+    setModalVisible(false);
+    setEditingGroupId(null); // تنظيف عند الإغلاق
+  }}
+  onSubmit={handleUpdatedGroup} // 👈 هنا نربط دالة الحفظ
+  
+  // 👇 نتحكم بالعنوان حسب الحالة (جديد أم تعديل)
+  title={editingGroupId ? "Edit Group" : TEXTS.newGroupTitle}
+  placeholder={TEXTS.newGroupPlaceholder}
+  
+  // 👇 السحر هنا! تمرير الاسم القديم في حالة التعديل
+  initialData={
+    editingGroupId 
+    ? { name: groups.find(g => g.id === editingGroupId)?.name } 
+    : {}
+  }
+/>
+</SafeAreaView>
+)};
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
@@ -229,16 +213,16 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginHorizontal: 20, marginBottom: 10, color: '#333' },
   
-  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  /*modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 15, padding: 25, elevation: 5 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 20, textAlign: 'left', backgroundColor: '#fafafa' },
   modalButtons: { flexDirection: 'row', gap: 10 },
   modalBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   cancelBtn: { backgroundColor: '#eee' },
-  saveBtn: { backgroundColor: '#1a237e' }
+  saveBtn: { backgroundColor: '#1a237e' }*/
 });
 
 export default HomeScreen;

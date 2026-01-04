@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useContext, useState } from 'react';
-import { Alert, FlatList, LayoutAnimation, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CounterCard from '../components/CounterCard';
 import InputModal from '../components/InputModal'; // ✅ الاستيراد الجديد
+import { COLORS } from '../constants/colors';
 import { TEXTS } from '../constants/translations';
 import { ProjectContext } from '../context/ProjectContext';
+import { generateId } from '../utils/generators';
+import { checkDuplicateName, validateStep } from '../utils/validation';
 
 export default function DashboardScreen({ route, navigation }) {
   // ✅ حذفنا كل States المدخلات (الاسم، اللون، الهدف..) لأن الموديل يديرها
@@ -54,27 +57,23 @@ export default function DashboardScreen({ route, navigation }) {
   const handleModalSubmit = (data) => {
     const { name, step, target, color } = data;
 
-    // التحقق من تكرار الاسم (Business Logic يفضل بقاؤه هنا)
-    const nameExists = items.some(i => 
-      i.name.trim().toLowerCase() === name.trim().toLowerCase() &&
-      i.id !== editingItem?.id // نستثني العنصر الحالي لو كنا نعدل
-    );
+    const duplicateName = checkDuplicateName(name, items, editingItem?.id);
 
-    if (nameExists) { 
-      Alert.alert(TEXTS.alertError, "This item name already exists!"); 
-      return; 
+    if (duplicateName) {
+      Alert.alert(TEXTS.alertError, "This item name already exists!");
+      return;
     }
 
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
     let updatedList;
 
     if (!editingItem) {
       // 🆕 إضافة جديد
       const newItem = { 
-        id: Date.now().toString(), 
+        id: generateId(), 
         name: name, 
         count: 0, 
-        step: step,
+        step: validateStep(step),
         target: target,
         color: color
       };
@@ -90,7 +89,7 @@ export default function DashboardScreen({ route, navigation }) {
     }
 
     saveChanges(updatedList);
-    setModalVisible(false); // نغلق الموديل بعد النجاح
+    setModalVisible(false);  //نغلق الموديل بعد النجاح
   };
 
   const handleUpdate = (itemId, type) => {
@@ -118,7 +117,7 @@ export default function DashboardScreen({ route, navigation }) {
   };
   
   const handleDelete = (itemId) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
     const filteredList = items.filter(i => i.id !== itemId);
     saveChanges(filteredList);
   };
@@ -172,7 +171,7 @@ export default function DashboardScreen({ route, navigation }) {
         columnWrapperStyle={isGridLayout ? {justifyContent: 'flex-start'} : null}
       />
 
-      <TouchableOpacity style={[localStyles.fab, { backgroundColor: '#2e7d32' }]} onPress={openAddModal}>
+      <TouchableOpacity style={[localStyles.fab, { backgroundColor: COLORS.secondary }]} onPress={openAddModal}>
         <Ionicons name="add" size={30} color="#fff" />
         <Text style={localStyles.fabLabel}>{TEXTS.addItemBtn}</Text>
       </TouchableOpacity>
@@ -201,7 +200,7 @@ export default function DashboardScreen({ route, navigation }) {
 // 🎨 Styles (حذفنا كل ستايلات الموديل منها)
 const localStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { backgroundColor: '#1a237e', paddingBottom: 15, elevation: 5 },
+  header: { backgroundColor: COLORS.primary, paddingBottom: 15, elevation: 5 },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15 },
   headerInfoContainer: { alignItems: 'center' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },

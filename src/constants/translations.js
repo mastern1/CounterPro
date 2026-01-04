@@ -1,6 +1,5 @@
 // src/constants/translations.js
 
-// اللغة الحالية: الإنجليزية
 const LANGUAGE = 'en'; 
 
 const textDatabase = {
@@ -20,17 +19,17 @@ const textDatabase = {
     statsGroups: "Groups",
     statsCount: "Total Count",
     newGroupBtn: "Create",
-    cancelBtn: "Cancel", // مستخدم في Home
+    cancelBtn: "Cancel", 
     newGroupTitle: "New Work Group",
     newGroupPlaceholder: "Project or Order Name",
     noGroups: "No work groups yet",
     deleteGroupTitle: "Delete Group",
     deleteGroupMsg: "Are you sure? All counters inside will be deleted.",
-    deleteBtn: "Delete", // مستخدم في Home
+    deleteBtn: "Delete",
     editFeature: "Coming Soon...",
     logOutBtn: "Logout",
     logOutTitle: "Logout Confirmation",
-    logOutMsg: "Are you sure you want to logout?, all unsynced data may be lost.",
+    logOutMsg: "Are you sure you want to logout? All unsynced data may be lost.",
 
     // --- Dashboard Screen ---
     itemsTitle: "Dashboard",
@@ -39,14 +38,15 @@ const textDatabase = {
     addItemBtn: "Add Item",
     newItemTitle: "New Counter Item",
     
-    // --- Shared Buttons (Buttons inside Alerts) ---
-    cancel: "Cancel",  // 👈 هذا اللي يدور عليه الكرت
-    delete: "Delete",  // 👈 هذا اللي يدور عليه الكرت
+    // --- Shared Buttons & Actions ---
+    cancel: "Cancel",
+    delete: "Delete",
     confirm: "Confirm",
+    confirmBtn: "Confirm", // 👈 ✅ (جديد) أضفناه لأن الداش بورد تطلبه
     save: "Save",
     edit: "Edit",
 
-    // --- Counter Card Texts (مهم جداً) ---
+    // --- Counter Card Texts ---
     itemName: "Item Name",
     itemStep: "Step (Increment)",
     itemTarget: "Target Goal (Optional)",
@@ -55,14 +55,15 @@ const textDatabase = {
     goal: "Goal", 
     step: "Step", 
     
-    // --- Alert Messages (Functions) ---
-    // 👇 هنا كان الخطأ، وحدنا الأسماء لتصبح كما يطلبها الكود
+    // --- Alert Messages (Functions & Titles) ---
     
     deleteTitle: "Delete Counter",
     deleteMessage: (name) => `Are you sure you want to delete "${name}"?`, 
     
-    resetTitle: "Reset Counter",
+    // 👇 ✅ (تصحيح) وحدنا الأسماء مع الداش بورد
+    resetAlertTitle: "Reset Counter", 
     resetMessage: (name) => `Are you sure you want to reset "${name}" to zero?`,
+    resetAlertMsg: "Are you sure you want to reset this item?", // رسالة احتياطية
   }
 };
 

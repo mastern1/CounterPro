@@ -1,163 +1,129 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// src/context/ProjectContext.js
+
 import { createContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+// 👇 استيراد الخدمة والأدوات
+import { StorageService } from '../services/storageService';
+import { generateId, getRandomColor } from '../utils/generators';
 
-// إنشاء القناة (Context)
 export const ProjectContext = createContext();
 
 export const ProjectProvider = ({ children }) => {
-  // ─── 1. الثوابت والمفاتيح (Professional Naming) ───
-  const STORAGE_KEY_DATA = '@counters_pro_data_v1';     // للبيانات
-  const STORAGE_KEY_USER = '@counters_pro_session_v1';  // للجلسة
-  const STORAGE_KEY_LAYOUT = '@counters_pro_layout_v1'; // للتصميم
+  // ─── 1. الحالة (State) ───
+  const [groups, setGroups] = useState([]);
+  const [userData, setUserData] = useState(null);
+  const [isGridLayout, setIsGridLayout] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // ─── 2. المتغيرات (States) ───
-  const [groups, setGroups] = useState([]); // المجموعات
-  const [userData, setUserData] = useState(null); // بيانات العامل
-  const [isGridLayout, setIsGridLayout] = useState(true); // نوع العرض
-  const [isLoading, setIsLoading] = useState(true); // حالة التحميل
-
-  // ─── 3. المراجع (Refs) للحفظ الذكي ───
+  // ─── 2. المراجع (Refs) للحفظ الذكي (بقيت كما هي) ✅ ───
   const saveTimeoutRef = useRef(null);
   const appState = useRef(AppState.currentState);
-  const previousGroupsRef = useRef(null); // لتتبع التغييرات ومنع الحفظ المتكرر
+  const previousGroupsRef = useRef(null);
 
-  // ─── 4. التحميل الأولي (يحدث مرة واحدة) ───
+  // ─── 3. التحميل الأولي (Clean & Fast) ───
   useEffect(() => {
-    const loadAllData = async () => {
+    const initApp = async () => {
       try {
-        // قراءة كل شيء دفعة واحدة (Parallel Execution)
-        const [savedGroups, savedUser, savedLayout] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY_DATA),
-          AsyncStorage.getItem(STORAGE_KEY_USER),
-          AsyncStorage.getItem(STORAGE_KEY_LAYOUT)
-        ]);
-
-        // 1. استرجاع المجموعات
-        if (savedGroups) {
-          setGroups(JSON.parse(savedGroups));
-          previousGroupsRef.current = savedGroups; // 👈 مهم جداً: نحفظ النسخة الأصلية للمقارنة
-        }
+        // المخ يطلب البيانات من الخدمة
+        const data = await StorageService.loadAll();
         
-        // 2. استرجاع جلسة المستخدم
-        if (savedUser) setUserData(JSON.parse(savedUser));
-
-        // 3. استرجاع شكل العرض
-        if (savedLayout) setIsGridLayout(JSON.parse(savedLayout));
-
+        // تعبئة البيانات
+        setGroups(data.groups);
+        previousGroupsRef.current = JSON.stringify(data.groups); // 👈 حفظنا النسخة الأصلية للمقارنة
+        setUserData(data.user);
+        setIsGridLayout(data.layout);
+        
       } catch (e) {
-        console.error("خطأ في تحميل البيانات:", e);
+        console.error("Initialization Failed", e);
       } finally {
-        setIsLoading(false); // انتهى التحميل
+        setIsLoading(false);
       }
     };
-
-    loadAllData();
+    initApp();
   }, []);
 
-  // ─── 5. نظام الحفظ الذكي (Smart Save Logic) ───
+  // ─── 4. 🔥🔥 المنطق الذكي (Smart Save Logic) 🔥🔥 ───
+  // هذا الكود هو "الدماغ" ويبقى هنا ولا ينتقل للخدمة
   useEffect(() => {
-    // 🛡️ حماية: لا تحفظ أثناء التحميل الأولي
+    // 🛡️ حماية 1: لا تحفظ أثناء التحميل
     if (isLoading) return;
 
-    // 🛡️ حماية: لا تحفظ إذا البيانات لم تتغير فعلياً
+    // 🛡️ حماية 2: لا تحفظ إذا البيانات لم تتغير فعلياً (مقارنة النصوص)
     const groupsString = JSON.stringify(groups);
     if (groupsString === previousGroupsRef.current) return;
     
-    // تحديث المرجع الحالي
+    // تحديث المرجع للمرة القادمة
     previousGroupsRef.current = groupsString;
 
-    // دالة الحفظ الفعلية
+    // دالة التنفيذ (هنا فقط استدعينا الخدمة)
     const saveNow = async () => {
       try {
-        await AsyncStorage.setItem(STORAGE_KEY_DATA, groupsString);
-        console.log("✅ Auto-saved successfully (Smart Save)");
+        // 👇 هنا التغيير الوحيد: بدل AsyncStorage مباشر، نادينا الخدمة
+        await StorageService.saveGroups(groups); 
+        console.log("✅ Smart Save Executed via Service");
       } catch (e) {
-        console.error("❌ Save failed:", e);
+        console.error("❌ Save failed", e);
       }
     };
 
-    // إلغاء أي مؤقت سابق (Debounce)
+    // ⏳ منطق الـ Debounce (الانتظار 500ms)
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-
-    // انتظر 500ms قبل الحفظ
+    
     saveTimeoutRef.current = setTimeout(() => {
       saveNow();
     }, 500);
 
-    // مراقب إغلاق التطبيق (لحماية البيانات عند الخروج المفاجئ)
+    // 📱 منطق مراقبة إغلاق التطبيق (AppState)
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current.match(/active/) && 
-        (nextAppState === 'background' || nextAppState === 'inactive')
-      ) {
-        // المستخدم يغلق التطبيق -> احفظ فوراً والغي الانتظار
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
+      if (appState.current.match(/active/) && (nextAppState === 'background' || nextAppState === 'inactive')) {
+        // المستخدم خرج؟ احفظ فوراً والغي الانتظار
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveNow();
       }
       appState.current = nextAppState;
     });
 
-    // تنظيف
     return () => {
       subscription.remove();
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
 
-  }, [groups, isLoading]);
+  }, [groups, isLoading]); // يراقب تغيير المجموعات
 
-  // ─── 6. حفظ تفضيل العرض (منفصل لأنه بسيط) ───
+  // ─── 5. باقي الأكواد (Layout, Login...) ───
+  
+  // حفظ التخطيط (بسيط لا يحتاج ذكاء، نحفظه فوراً عبر الخدمة)
   useEffect(() => {
-    const saveLayout = async () => {
-      if (isLoading) return;
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY_LAYOUT, JSON.stringify(isGridLayout));
-      } catch (e) { console.error("فشل حفظ التخطيط"); }
-    };
-    saveLayout();
+    if (!isLoading) {
+      StorageService.saveLayout(isGridLayout);
+    }
   }, [isGridLayout, isLoading]);
 
-
-  // ─── 7. الوظائف (Actions) ───
-
-  // تسجيل الدخول
   const loginUser = async (name, deviceId) => {
     const user = { name, deviceId, loginTime: new Date().toISOString() };
     setUserData(user);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-    } catch (e) { console.error("فشل تسجيل الدخول"); }
+    await StorageService.saveUser(user);
   };
 
-  // تسجيل الخروج الكامل
   const logoutUser = async () => {
-    try {
-      await AsyncStorage.clear(); 
+    const success = await StorageService.clearAll();
+    if (success) {
       setGroups([]);
       setUserData(null);
       setIsGridLayout(true);
-      return true;
-    } catch (e) {
-      console.error("فشل تسجيل الخروج", e);
-      return false;
     }
   };
 
-  // تبديل العرض
-  const toggleLayout = () => {
-    setIsGridLayout(prev => !prev);
-  };
+  const toggleLayout = () => setIsGridLayout(prev => !prev);
 
-  // إضافة مجموعة جديدة
-  const addNewGroup = (groupName) => {
+  // ✅ استخدام name وتوحيد التسمية
+  const addNewGroup = (name) => {
     if (!userData) return;
     const newGroup = {
-      id: Date.now().toString(),
-      groupName: groupName,
+      id: generateId(),
+      name: name,
       color: getRandomColor(),
       createdAt: new Date().toISOString(),
       createdBy: userData.name,
@@ -167,56 +133,23 @@ export const ProjectProvider = ({ children }) => {
     setGroups([newGroup, ...groups]); 
   };
 
-  // تعديل اسم مجموعة
   const editGroup = (groupId, newName) => {
-    const updatedGroup = groups.map(group => {
-      if (group.id === groupId) {
-        return { ...group, groupName: newName };
-      }
-      return group;
-    });
-    setGroups(updatedGroup);
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name: newName } : g));
   };
 
-  // حذف مجموعة
   const deleteGroup = (groupId) => {
-    const filtered = groups.filter(g => g.id !== groupId);
-    setGroups(filtered);
+    setGroups(prev => prev.filter(g => g.id !== groupId));
   };
 
-  // تحديث محتوى مجموعة (عدادات)
   const updateGroup = (groupId, newItems) => {
-    setGroups(prevGroups => prevGroups.map(group => {
-      if (group.id === groupId) {
-        return { ...group, items: newItems };
-      }
-      return group;
-    }));
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, items: newItems } : g));
   };
 
-  // توليد لون عشوائي
-  const getRandomColor = () => {
-    const colors = ['#1a237e', '#c62828', '#2e7d32', '#f9a825', '#4a148c', '#00838f'];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  // ─── 8. التصدير (Export) ───
   return (
     <ProjectContext.Provider value={{ 
-      // البيانات
-      groups, 
-      userData,
-      isGridLayout,
-      isLoading,
-
-      // الوظائف
-      loginUser,
-      logoutUser,
-      toggleLayout,
-      addNewGroup, 
-      deleteGroup, 
-      updateGroup, // تأكدنا من تسميتها هكذا لتتوافق مع الداش بورد
-      editGroup 
+      groups, userData, isGridLayout, isLoading,
+      loginUser, logoutUser, toggleLayout,
+      addNewGroup, deleteGroup, updateGroup, editGroup 
     }}>
       {children}
     </ProjectContext.Provider>

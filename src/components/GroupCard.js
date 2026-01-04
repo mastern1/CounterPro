@@ -20,7 +20,7 @@ const GroupCard = ({
       <View style={styles.contentContainer}>
         <View style={styles.textContainer}>
           <Text style={styles.groupName} numberOfLines={1}>
-            {item.groupName}
+            {item.name}
           </Text>
           <Text style={styles.subText}>
             {item.items?.length || 0} Counters • {new Date(parseInt(item.id)).toLocaleDateString('en-US')}

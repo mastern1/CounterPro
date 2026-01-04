@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // 👇 استيراد ملف النصوص
+import * as Haptics from 'expo-haptics';
 import { TEXTS as appStrings } from '../constants/translations';
 
 const CounterCard = ({ 
@@ -25,14 +26,15 @@ const CounterCard = ({
 
     // اهتزاز الهدف
     if (targetValue > 0 && nextValue >= targetValue) {
-      Vibration.vibrate([0, 400]); 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); 
     } else {
-      Vibration.vibrate(10);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onIncrement(item.id);
   };
 
   const handleDeleteConfirm = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
       appStrings.deleteTitle,
       appStrings.deleteMessage(item.name),

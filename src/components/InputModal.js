@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text, TextInput, TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text, TextInput, TouchableOpacity,
+  View
 } from 'react-native';
+import { COLORS } from '../constants/colors';
 import { TEXTS } from '../constants/translations';
+import { validateName } from "../utils/validation";
 
 // نفس ألوانك الأصلية
-const COLORS_PALETTE = [
+/*const COLORS_PALETTE = [
   '#1A73E8', '#43A047', '#E91E63', '#FF9800', 
   '#8E24AA', '#5D4037', '#546E7A', '#00ACC1'
-];
+];*/
 
 const InputModal = ({ 
   visible, 
@@ -32,7 +34,7 @@ const InputModal = ({
   const [name, setName] = useState('');
   const [step, setStep] = useState('1');
   const [target, setTarget] = useState('');
-  const [selectedColor, setSelectedColor] = useState(COLORS_PALETTE[0]);
+  const [selectedColor, setSelectedColor] = useState(COLORS.palette[0]);
 
   // عند فتح الموديل: ملء البيانات أو التصفير
   useEffect(() => {
@@ -40,16 +42,18 @@ const InputModal = ({
       setName(initialData.name || '');
       setStep(initialData.step ? String(initialData.step) : '1');
       setTarget(initialData.target ? String(initialData.target) : '');
-      setSelectedColor(initialData.color || COLORS_PALETTE[0]);
+      setSelectedColor(initialData.color || COLORS.palette[0]);
     }
   }, [visible, initialData]);
 
   const handleSubmit = () => {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        Alert.alert(TEXTS.alertError, "Name is required"); 
-       return; }
-      // حماية بسيطة (يمكنك إضافة Alert هنا لو أردت)
+    // تحقق من الاسم  
+    const nameValidation = validateName(name);
+    if (!nameValidation.valid){
+       Alert.alert(TEXTS.alertError, nameValidation.error); 
+       return;
+    }
+    
 
     // تجهيز الحزمة
     const data = {
@@ -80,7 +84,7 @@ const InputModal = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{title || "New Item"}</Text>
+          <Text style={[styles.modalTitle, {color:COLORS.primary}]}>{title || "New Item"}</Text>
           
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* 1. الاسم */}
@@ -125,7 +129,7 @@ const InputModal = ({
               <>
                 <Text style={styles.label}>Color:</Text>
                 <View style={styles.colorContainer}>
-                  {COLORS_PALETTE.map((color) => (
+                  {COLORS.palette.map((color) => (
                     <TouchableOpacity
                       key={color}
                       style={[
@@ -150,7 +154,7 @@ const InputModal = ({
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[styles.modalBtn, {backgroundColor: '#1a237e'}]} 
+              style={[styles.modalBtn, {backgroundColor: COLORS.primary}]} 
               onPress={handleSubmit}
             >
               <Text style={{color: '#fff', fontWeight: 'bold'}}>Save</Text>
@@ -167,7 +171,7 @@ const InputModal = ({
 const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 20, padding: 25, maxHeight: '80%' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#1a237e' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   label: { textAlign: 'left', marginBottom: 5, fontSize: 14, color: '#666' }, 
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, marginBottom: 15, textAlign: 'left', backgroundColor: '#f9f9f9' }, 
   modalButtons: { flexDirection: 'row', gap: 15, marginTop: 10 },
