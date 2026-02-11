@@ -1,50 +1,88 @@
-# Welcome to your Expo app 👋
+# 🏭 CounterPro | Production Tracking System
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![Status](https://img.shields.io/badge/Status-Under_Development-orange) ![Platform](https://img.shields.io/badge/Platform-iOS_%7C_Android-blue) ![Expo](https://img.shields.io/badge/Built_with-Expo_SDK_54-black)
 
-## Get started
+**CounterPro** is a specialized, high-performance mobile application designed for factories to track worker productivity in real-time. It replaces manual paper counting with a digital, error-free interface optimized for speed and factory environments.
 
-1. Install dependencies
+> 🚧 **Project Status:** Active Development (MVP Phase).
+
+---
+
+## 🚀 Key Features
+
+### ✅ Current Capabilities
+
+- **🏭 Smart Group System:** Organize production lines into specific groups (e.g., "Sewing Line A", "Cutting Section").
+- **⚡ Adaptive Counter UI:**
+  - Designed for high-speed, repetitive tapping.
+  - **Dynamic Sizing:** Buttons automatically resize to fit any screen size, minimizing accidental touches.
+  - **Haptic Feedback:** Physical vibration feedback for every count to ensure accuracy without looking at the screen.
+- **📂 Session Management:**
+  - Tracks specific work sessions with timestamps (Start/End).
+  - Maintains separate counts for different products/workers within the same device.
+- **🔌 Offline-First Architecture:** Fully functional without an internet connection, ensuring zero downtime on the factory floor.
+
+---
+
+## 🗺️ Roadmap & Future Plans
+
+We are building a complete ecosystem for factory management. Upcoming features include:
+
+- [ ] **☁️ Cloud Sync (Supabase):** Real-time data synchronization to a central cloud database.
+- [ ] **📊 Admin Dashboard:** A dedicated Web Dashboard (Next.js) for managers to monitor production live from the office.
+- [ ] **🔐 Worker Authentication:** Secure login using worker IDs or QR codes.
+- [ ] **📈 Analytics:** Charts and reports for daily/weekly productivity trends.
+
+---
+
+## 🛠 Technical Stack
+
+This project follows a clean, scalable architecture to ensure performance and maintainability.
+
+| Category             | Technology                                      |
+| -------------------- | ----------------------------------------------- |
+| **Framework**        | React Native (Expo SDK 54)                      |
+| **Architecture**     | Component-Based with Context API                |
+| **Navigation**       | React Navigation (Native Stack)                 |
+| **State Management** | React Context & Hooks                           |
+| **Storage**          | AsyncStorage (Local) → SQLite/Supabase (Future) |
+| **Language**         | JavaScript (ES6+)                               |
+| **Styling**          | StyleSheet API (Responsive Design)              |
+
+---
+
+## 🏃‍♂️ Getting Started
+
+To run this project locally:
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone [https://github.com/masternur22/CounterPro.git](https://github.com/mastern1/CounterPro.git)
+   ```
+
+   2. **nstall dependencies:**
 
    ```bash
    npm install
    ```
 
-2. Start the app
+   3.**Start the app (Clean Cache):**
 
    ```bash
-   npx expo start
+   npx expo start -c
    ```
 
-In the output, you'll find options to open the app in a
+   ***
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📄 License
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## Get a fresh project
+Copyright © 2026 **Nour Eddin Sweid**.
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
-```
+## 📞 Contact & Contribution
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Created by **Nour Eddin Sweid**. For inquiries or collaboration, please contact the developer directly.
