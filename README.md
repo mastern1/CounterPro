@@ -61,7 +61,7 @@ To run this project locally:
    git clone [https://github.com/masternur22/CounterPro.git](https://github.com/mastern1/CounterPro.git)
    ```
 
-   2. **nstall dependencies:**
+   2. **Install dependencies:**
 
    ```bash
    npm install
