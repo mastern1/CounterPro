@@ -67,7 +67,7 @@ To run this project locally:
    npm install
    ```
 
-   3.**Start the app (Clean Cache):**
+   3. **Start the app (Clean Cache):**
 
    ```bash
    npx expo start -c
