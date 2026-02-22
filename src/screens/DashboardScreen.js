@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 
+import { useSessionManager } from "../hooks/useSessionManager";
 import CounterCard from "../components/CounterCard";
 import InputModal from "../components/InputModal";
 import SessionTimer from "../components/SessionTimer";
@@ -73,6 +74,15 @@ export default function DashboardScreen({ route, navigation }) {
 
   // ✅ 2. العناصر (نستخدم useMemo لضمان ثبات عنوان المصفوفة في الذاكرة)
   const items = useMemo(() => currentGroup?.items ?? [], [currentGroup]);
+  const { startSession, endSession } = useSessionManager(
+    items,
+    { id: groupId, name: groupName },
+    { name: userData?.name },
+  );
+  const visibleItems = useMemo(
+    () => items.filter((i) => !i.isDeleted),
+    [items],
+  );
 
   // ✅ 3. حسابات الشبكة (ثقيلة وتستحق useMemo)
   const { numColumns, dynamicCardWidth } = useMemo(() => {
@@ -160,17 +170,10 @@ export default function DashboardScreen({ route, navigation }) {
 
   const handleDelete = useCallback(
     (itemId) => {
-      Alert.alert(TEXTS.deleteItemTitle, TEXTS.deleteItemMsg, [
-        { text: TEXTS.cancelBtn, style: "cancel" },
-        {
-          text: TEXTS.deleteBtn,
-          style: "destructive",
-          onPress: () => {
-            const filteredList = items.filter((i) => i.id !== itemId);
-            saveChanges(filteredList);
-          },
-        },
-      ]);
+      const softDeletedList = items.map((i) =>
+        i.id === itemId ? { ...i, isDeleted: true } : i,
+      );
+      saveChanges(softDeletedList);
     },
     [items, saveChanges],
   );
@@ -217,6 +220,7 @@ export default function DashboardScreen({ route, navigation }) {
           step: validateStep(step),
           target,
           color,
+          isDeleted: false,
         };
         updatedList = [newItem, ...items];
       } else {
@@ -348,19 +352,12 @@ export default function DashboardScreen({ route, navigation }) {
       </View>
 
       {/* ✅ ربط التايمر بالريموت */}
-      <SessionTimer
-        ref={timerRef}
-        onStart={() => console.log("Session Started")}
-        onStop={(duration) => {
-          console.log("Session Ended:", duration);
-          // 💡 لاحقاً: كود الحفظ في قاعدة البيانات هنا
-        }}
-      />
+      <SessionTimer ref={timerRef} onStart={startSession} onStop={endSession} />
 
       <FlatList
         // ✅ مفتاح لتغيير التخطيط (يمنع مشاكل الأعمدة في أندرويد)
         key={isGridLayout ? `grid-${numColumns}` : "list"}
-        data={items}
+        data={visibleItems}
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}

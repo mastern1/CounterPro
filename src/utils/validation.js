@@ -3,18 +3,20 @@
 export const validateName = (name) => {
   const trimmed = name.trim();
   if (!trimmed) {
-    return { valid: false, error: 'Name is required' };
+    return { valid: false, error: "Name is required" };
   }
   if (trimmed.length < 2) {
-    return { valid: false, error: 'Name too short' };
+    return { valid: false, error: "Name too short" };
   }
   return { valid: true };
 };
 
 export const checkDuplicateName = (name, items, excludeId = null) => {
-  return items.some(i => 
-    i.name.trim().toLowerCase() === name.trim().toLowerCase() &&
-    i.id !== excludeId
+  return items.some(
+    (i) =>
+      !i.isDeleted &&
+      i.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+      i.id !== excludeId,
   );
 };
 

@@ -120,6 +120,7 @@ export const ProjectProvider = ({ children }) => {
         createdAt: new Date().toISOString(),
         createdBy: userData.name,
         deviceId: userData.deviceId,
+        isDeleted: false,
         items: [],
       };
       setGroups((prev) => [newGroup, ...prev]);
@@ -136,7 +137,9 @@ export const ProjectProvider = ({ children }) => {
 
   // ✅ حذف مجموعة
   const deleteGroup = useCallback((groupId) => {
-    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, isDeleted: true } : g)),
+    );
   }, []);
 
   // ✅ تحديث عناصر مجموعة

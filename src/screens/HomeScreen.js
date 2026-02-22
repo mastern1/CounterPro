@@ -25,13 +25,14 @@ const HomeScreen = ({ navigation }) => {
 
   // ✅ 1. تحسين الأداء: حساب المجموع فقط عند تغير المجموعات
   const totalCounts = useMemo(() => {
-    return groups.reduce((total, group) => {
-      const groupTotal = (group.items || []).reduce(
-        (gTotal, item) => gTotal + (item.count || 0),
-        0,
-      );
-      return total + groupTotal;
-    }, 0);
+    return groups
+      .filter((g) => !g.isDeleted)
+      .reduce((total, group) => {
+        const groupTotal = (group.items || [])
+          .filter((item) => !item.isDeleted)
+          .reduce((gTotal, item) => gTotal + (item.count || 0), 0);
+        return total + groupTotal;
+      }, 0);
   }, [groups]);
 
   // ✅ 2. تثبيت الدوال لمنع إعادة رسم الكروت
@@ -110,6 +111,11 @@ const HomeScreen = ({ navigation }) => {
     [handlePressGroup, handleDeleteGroup],
   );
 
+  const visibleGroups = useMemo(
+    () => groups.filter((g) => !g.isDeleted),
+    [groups],
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -133,7 +139,7 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{groups.length}</Text>
+          <Text style={styles.statNumber}>{visibleGroups.length}</Text>
           <Text style={styles.statLabel}>{TEXTS.statsGroups}</Text>
         </View>
         <View style={styles.statCard}>
@@ -145,7 +151,7 @@ const HomeScreen = ({ navigation }) => {
       <Text style={styles.sectionTitle}>{TEXTS.groupsTitle}</Text>
 
       <FlatList
-        data={groups}
+        data={visibleGroups}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={renderItem} // ✅ استخدام الدالة الثابتة

@@ -4,6 +4,7 @@ import React, {
   useRef,
   forwardRef,
   useImperativeHandle,
+  useCallback, // ✅ أضفنا استيراد useCallback
 } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,19 +22,17 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
   const pausedTimeRef = useRef(0);
   const pauseStartRef = useRef(null);
 
-  // 🛑 دالة الإيقاف المركزية (يستخدمها الزر + يستخدمها الأب عند الخروج)
-  const performStop = () => {
+  // 🛑 دالة الإيقاف المركزية (مغلفة بـ useCallback لضمان ثباتها)
+  const performStop = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
 
-    // حساب الوقت النهائي بدقة
-    let finalSeconds = seconds;
+    // ✅ تم التعديل: حساب الوقت النهائي بناءً على Date.now فقط (بدون الاعتماد على state المتغير)
+    let finalSeconds = 0;
 
-    // إذا كان التايمر يعمل، نحسب الوقت الحقيقي بناءً على Date.now()
     if (startTimeRef.current) {
       const now = Date.now();
       let totalPaused = pausedTimeRef.current;
 
-      // إذا كنا في حالة توقف مؤقت حالياً، نضيف مدة التوقف الحالية
       if (pauseStartRef.current) {
         totalPaused += now - pauseStartRef.current;
       }
@@ -43,7 +42,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
       );
     }
 
-    // إرسال النتيجة
+    // إرسال النتيجة للأب
     if (onStop) onStop(finalSeconds);
 
     // تصفير كل شيء
@@ -53,21 +52,19 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     startTimeRef.current = null;
     pausedTimeRef.current = 0;
     pauseStartRef.current = null;
-  };
+  }, [onStop]); // تعتمد فقط على onStop
 
   // 🔗 فتح قناة الاتصال مع الأب (Dashboard)
   useImperativeHandle(
     ref,
     () => ({
-      // الأب يسأل: هل أنت شغال؟
       isSessionActive: () => isActive,
-      // الأب يأمر: توقف فوراً
       requestStop: () => {
-        performStop(); // ✅ نستدعي الدالة الداخلية مباشرة
+        performStop();
       },
     }),
-    [isActive, seconds],
-  ); // ✅ نحدث الـ ref عند تغير الحالة
+    [isActive, performStop], // ✅ المصفوفة الآن صحيحة 100% وخالية من الأخطاء
+  );
 
   // 🕒 العداد (يعمل فقط للعرض، الحساب الفعلي يعتمد على Date.now)
   useEffect(() => {
@@ -141,7 +138,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
         text: "End & Save",
         style: "destructive",
         onPress: () => {
-          performStop(); // ✅ استدعاء مباشر للدالة المركزية
+          performStop();
         },
       },
     ]);
@@ -253,5 +250,4 @@ const styles = StyleSheet.create({
 
 SessionTimer.displayName = "SessionTimer";
 
-// ✅ تصدير المكون
 export default React.memo(SessionTimer);

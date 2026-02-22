@@ -9,7 +9,6 @@ import { TEXTS as appStrings } from "../constants/translations";
 const HIT_SLOP_SMALL = { top: 10, bottom: 10, left: 10, right: 10 };
 const HIT_SLOP_LARGE = { top: 15, bottom: 15, left: 15, right: 15 };
 const ACTIVE_OPACITY = 0.8;
-const DEFAULT_COLOR = "#1A73E8";
 
 const CounterCard = ({
   item,
