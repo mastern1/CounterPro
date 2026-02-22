@@ -1,119 +1,136 @@
-import { Ionicons } from '@expo/vector-icons'; // ✅ استيراد الأيقونات
-import { useContext, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import GroupCard from '../components/GroupCard';
-import InputModal from '../components/InputModal';
-import { COLORS } from '../constants/colors';
-import { TEXTS } from '../constants/translations';
-import { ProjectContext } from '../context/ProjectContext';
-import { checkDuplicateName } from '../utils/validation';
+import { Ionicons } from "@expo/vector-icons";
+import { useContext, useState, useMemo, useCallback } from "react"; // ✅ إضافة الهوكس
+import {
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import GroupCard from "../components/GroupCard";
+import InputModal from "../components/InputModal";
+import { COLORS } from "../constants/colors";
+import { TEXTS } from "../constants/translations";
+import { ProjectContext } from "../context/ProjectContext";
+import { checkDuplicateName } from "../utils/validation";
 
 const HomeScreen = ({ navigation }) => {
-  // ❌ لم نعد بحاجة لقراءة route.params
-  // ✅ نستورد بيانات المستخدم ودالة الخروج من المخ مباشرة
-  const { groups, addNewGroup, deleteGroup, userData, logoutUser, editGroup } = useContext(ProjectContext);
-  
+  const { groups, addNewGroup, deleteGroup, userData, logoutUser, editGroup } =
+    useContext(ProjectContext);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
 
-  // حساب إجمالي العدادات
-  const totalCounts = groups.reduce((total, group) => {
-    const groupTotal = (group.items || []).reduce((gTotal, item) => gTotal + (item.count || 0), 0);
-    return total + groupTotal;
-  }, 0);
+  // ✅ 1. تحسين الأداء: حساب المجموع فقط عند تغير المجموعات
+  const totalCounts = useMemo(() => {
+    return groups.reduce((total, group) => {
+      const groupTotal = (group.items || []).reduce(
+        (gTotal, item) => gTotal + (item.count || 0),
+        0,
+      );
+      return total + groupTotal;
+    }, 0);
+  }, [groups]);
 
-  const handlePressGroup = (group) => {
-    navigation.navigate('Dashboard', { 
-      groupId: group.id, 
-      groupName: group.name
-      // لم نعد بحاجة لتمرير workerName لأن الداش بورد يقرأه من الكونتكست أيضاً
-    });
-  };
+  // ✅ 2. تثبيت الدوال لمنع إعادة رسم الكروت
+  const handlePressGroup = useCallback(
+    (group) => {
+      navigation.navigate("Dashboard", {
+        groupId: group.id,
+        groupName: group.name,
+      });
+    },
+    [navigation],
+  );
 
+  const handleDeleteGroup = useCallback(
+    (id) => {
+      Alert.alert(TEXTS.deleteGroupTitle, TEXTS.deleteGroupMsg, [
+        { text: TEXTS.cancelBtn, style: "cancel" },
+        {
+          text: TEXTS.deleteBtn,
+          style: "destructive",
+          onPress: () => deleteGroup(id),
+        },
+      ]);
+    },
+    [deleteGroup],
+  ); // يعتمد على دالة Context الثابتة
 
+  const handleUpdatedGroup = useCallback(
+    (data) => {
+      const { name } = data;
+      const duplicateName = checkDuplicateName(name, groups, editingGroupId);
+      if (duplicateName) {
+        Alert.alert(TEXTS.alertError, "This group name already exists!");
+        return;
+      }
+      const trimmedName = name.trim();
+      if (editingGroupId === null) {
+        addNewGroup(trimmedName);
+      } else {
+        editGroup(editingGroupId, trimmedName);
+      }
+      setModalVisible(false);
+      setEditingGroupId(null);
+    },
+    [groups, editingGroupId, addNewGroup, editGroup],
+  );
 
-  const handleUpdatedGroup = (data) => {
-    const {name} = data;
-   
-    const duplicateName = checkDuplicateName(name, groups, editingGroupId);
-    if (duplicateName) {
-      Alert.alert(TEXTS.alertError, "This group name already exists!");
-      return;
-    }
-
-    const trimmedName = name.trim();
-
-  if (editingGroupId === null) {
-    addNewGroup(trimmedName);
-  } else {
-    editGroup(editingGroupId, trimmedName);
-  }
-    setModalVisible(false);
-    setEditingGroupId(null);
-  };
-
-
-
-  const handleDeleteGroup = (id) => {
-    Alert.alert(TEXTS.deleteGroupTitle, TEXTS.deleteGroupMsg, [
-        { text: TEXTS.cancelBtn, style: 'cancel' },
-        { text: TEXTS.deleteBtn, style: 'destructive', onPress: () => deleteGroup(id) }
+  const handleLogout = () => {
+    Alert.alert(TEXTS.logOutTitle, TEXTS.logOutMsg, [
+      { text: TEXTS.cancelBtn, style: "cancel" },
+      {
+        text: TEXTS.logOutBtn,
+        style: "destructive",
+        onPress: async () => {
+          await logoutUser();
+          navigation.reset({ index: 0, routes: [{ name: "WorkerIdentity" }] });
+        },
+      },
     ]);
   };
 
-  // ✅ التعامل مع زر الخروج
-  // ✅ التعامل مع زر الخروج (التصحيح)
-  const handleLogout = () => {
-    Alert.alert(
-      TEXTS.logOutTitle, // العنوان
-      TEXTS.logOutMsg, // الرسالة
-      [
-        { text: TEXTS.cancelBtn, style: "cancel" },
-        { 
-          text: TEXTS.logOutBtn, 
-          style: "destructive", 
-          onPress: async () => {
-            // 1. أولاً: ننفذ الحذف من المخ وننتظر حتى ينتهي
-            await logoutUser();
-            
-            // 2. ثانياً: بعد التأكد من الحذف، نوجه المستخدم لشاشة الدخول
-            // نستخدم reset لكي نمنع المستخدم من الرجوع للخلف
-            navigation.reset({
-              index: 0,
-              routes: [{ name:'WorkerIdentity' }], // تأكد أن اسم الشاشة في App.js هو 'WorkerIdentity'
-            });
-          }
-        }
-      ]
-    );
-  };
+  // ✅ 3. دالة رسم الكرت (مهمة جداً لـ FlatList)
+  const renderItem = useCallback(
+    ({ item }) => (
+      <GroupCard
+        item={item}
+        onPress={() => handlePressGroup(item)}
+        onEdit={() => {
+          setEditingGroupId(item.id);
+          setModalVisible(true);
+        }}
+        onExport={() => Alert.alert(TEXTS.alertError, TEXTS.editFeature)}
+        onDelete={() => handleDeleteGroup(item.id)}
+      />
+    ),
+    [handlePressGroup, handleDeleteGroup],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      
-      {/* --- HEADER --- */}
       <View style={styles.header}>
         <View>
-          {/* ✅ قراءة الاسم من الكونتكست */}
-          <Text style={styles.greeting}>{TEXTS.greeting} {userData?.name || 'Boss'} 👋</Text>
+          <Text style={styles.greeting}>
+            {TEXTS.greeting} {userData?.name || "Boss"} 👋
+          </Text>
           <Text style={styles.date}>{new Date().toDateString()}</Text>
         </View>
-
         <View style={styles.headerRight}>
-            {/* بادج نوع الجهاز */}
-            <View style={styles.deviceIdBadge}>
-                <Text style={styles.deviceIdText}>{userData?.deviceId || 'Mobile'}</Text>
-            </View>
-            
-            {/* 🆕 زر الخروج */}
-            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-                <Ionicons name="log-out-outline" size={22} color="#D32F2F" />
-            </TouchableOpacity>
+          <View style={styles.deviceIdBadge}>
+            <Text style={styles.deviceIdText}>
+              {userData?.deviceId || "Mobile"}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={22} color="#D32F2F" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* --- STATS --- */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{groups.length}</Text>
@@ -126,103 +143,102 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <Text style={styles.sectionTitle}>{TEXTS.groupsTitle}</Text>
-      
-      {/* --- LIST --- */}
+
       <FlatList
         data={groups}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <GroupCard 
-            item={item}
-            onPress={() => handlePressGroup(item)}
-            onEdit={() => {
-              setEditingGroupId(item.id);
-               setModalVisible(true);}}
-            onExport={() => Alert.alert(TEXTS.alertError, TEXTS.editFeature)}
-            onDelete={() => handleDeleteGroup(item.id)}
-          />
-        )}
+        renderItem={renderItem} // ✅ استخدام الدالة الثابتة
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <Text style={{ color: '#999' }}>{TEXTS.noGroups}</Text>
+          <View style={{ alignItems: "center", marginTop: 50 }}>
+            <Text style={{ color: "#999" }}>{TEXTS.noGroups}</Text>
           </View>
         }
       />
 
-      {/* --- FAB (Add Button) --- */}
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setModalVisible(true)}
+      >
         <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
-      {/* --- MODAL --- */}
-      {/* 👇 المكون الجديد: سطر واحد يقوم بكل العمل */}
-<InputModal 
-  visible={modalVisible}
-  onClose={() => {
-    setModalVisible(false);
-    setEditingGroupId(null); // تنظيف عند الإغلاق
-  }}
-  onSubmit={handleUpdatedGroup} // 👈 هنا نربط دالة الحفظ
-  
-  // 👇 نتحكم بالعنوان حسب الحالة (جديد أم تعديل)
-  title={editingGroupId ? "Edit Group" : TEXTS.newGroupTitle}
-  placeholder={TEXTS.newGroupPlaceholder}
-  
-  // 👇 السحر هنا! تمرير الاسم القديم في حالة التعديل
-  initialData={
-    editingGroupId 
-    ? { name: groups.find(g => g.id === editingGroupId)?.name } 
-    : {}
-  }
-/>
-</SafeAreaView>
-)};
+      <InputModal
+        visible={modalVisible}
+        onClose={() => {
+          setModalVisible(false);
+          setEditingGroupId(null);
+        }}
+        onSubmit={handleUpdatedGroup}
+        title={editingGroupId ? "Edit Group" : TEXTS.newGroupTitle}
+        placeholder={TEXTS.newGroupPlaceholder}
+        initialData={
+          editingGroupId
+            ? { name: groups.find((g) => g.id === editingGroupId)?.name }
+            : {}
+        }
+      />
+    </SafeAreaView>
+  );
+};
 
-
+// ... الستايلات تبقى كما هي ...
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    paddingTop: 10, 
-    marginBottom: 20 
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    marginBottom: 20,
   },
-  headerRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  greeting: { fontSize: 22, fontWeight: "bold", color: "#333" },
+  date: { fontSize: 14, color: "#666", marginTop: 2 },
+  deviceIdBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#e3f2fd",
+    borderRadius: 8,
   },
-  greeting: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-  date: { fontSize: 14, color: '#666', marginTop: 2 },
-  
-  deviceIdBadge: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#e3f2fd', borderRadius: 8 },
-  deviceIdText: { color: '#1a237e', fontWeight: 'bold', fontSize: 12 },
-  
-  logoutBtn: {
-      padding: 8,
-      backgroundColor: '#FFEBEE', // خلفية حمراء فاتحة جداً
-      borderRadius: 8,
+  deviceIdText: { color: "#1a237e", fontWeight: "bold", fontSize: 12 },
+  logoutBtn: { padding: 8, backgroundColor: "#FFEBEE", borderRadius: 8 },
+  statsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    gap: 12,
   },
-
-  statsContainer: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 20, gap: 12 },
-  statCard: { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', elevation: 2 },
-  statNumber: { fontSize: 24, fontWeight: 'bold', color: '#1a237e' },
-  statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginHorizontal: 20, marginBottom: 10, color: '#333' },
-  
-  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
-  
-  /*modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 15, padding: 25, elevation: 5 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 20, textAlign: 'left', backgroundColor: '#fafafa' },
-  modalButtons: { flexDirection: 'row', gap: 10 },
-  modalBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#eee' },
-  saveBtn: { backgroundColor: '#1a237e' }*/
+  statCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    elevation: 2,
+  },
+  statNumber: { fontSize: 24, fontWeight: "bold", color: "#1a237e" },
+  statLabel: { fontSize: 12, color: "#666", marginTop: 4 },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginHorizontal: 20,
+    marginBottom: 10,
+    color: "#333",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 30,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
+  },
 });
 
 export default HomeScreen;

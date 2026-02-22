@@ -1,5 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useContext, useState } from "react";
+import {
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import {
   Alert,
   FlatList,
@@ -10,134 +17,129 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeepAwake } from "expo-keep-awake";
+
 import CounterCard from "../components/CounterCard";
 import InputModal from "../components/InputModal";
+import SessionTimer from "../components/SessionTimer";
 import { COLORS } from "../constants/colors";
 import { TEXTS } from "../constants/translations";
 import { ProjectContext } from "../context/ProjectContext";
 import { generateId } from "../utils/generators";
 import { checkDuplicateName, validateStep } from "../utils/validation";
-import SessionTimer from "../components/SessionTimer";
+
+// ── 1. ثوابت خارج الكومبوننت (تحسين الأداء) ──────────────────────────
+const GAP_SIZE = 8;
+const SCREEN_PADDING = 10;
+const CARD_MARGIN = 3;
+const MIN_CARD_WIDTH = 110; // 👈 الرقم الذهبي للتابلت (4 أعمدة)
+
+// ── 2. ستايلات ثابتة للقوائم ─────────────────────────────────────────
+const CONTENT_CONTAINER_STYLE = { padding: SCREEN_PADDING, paddingBottom: 120 };
+const GRID_COLUMN_WRAPPER_STYLE = {
+  justifyContent: "flex-start",
+  gap: GAP_SIZE,
+};
+
+// ── 3. مكون القائمة الفارغة (Static) ─────────────────────────────────
+const EmptyList = () => (
+  <View style={localStyles.emptyContainer}>
+    <Text style={localStyles.emptyText}>{TEXTS.noItems}</Text>
+    <Text style={localStyles.emptySubText}>{TEXTS.startItemMsg}</Text>
+  </View>
+);
 
 export default function DashboardScreen({ route, navigation }) {
+  // ── Hooks الأساسية ──
+  useKeepAwake();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const timerRef = useRef(null); // 👈 ريموت كنترول للتايمر
+
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const { groups, updateGroup, isGridLayout, toggleLayout, userData } =
     useContext(ProjectContext);
   const { groupId, groupName } = route?.params || {};
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
 
-  const currentGroup = groups.find((g) => g.id === groupId);
+  // ── الحسابات والبيانات ──
 
-  if (!currentGroup) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Ionicons name="alert-circle-outline" size={64} color="#999" />
-        <Text style={{ fontSize: 18, color: "#666", marginTop: 10 }}>
-          Group not found!
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{
-            marginTop: 20,
-            padding: 10,
-            backgroundColor: "#eee",
-            borderRadius: 8,
-          }}
-        >
-          <Text>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // ✅ 1. البحث عن المجموعة (useMemo ضروري هنا)
+  const currentGroup = useMemo(
+    () => groups.find((g) => g.id === groupId),
+    [groups, groupId],
+  );
 
-  const items = currentGroup?.items || [];
+  // ✅ 2. العناصر (نستخدم useMemo لضمان ثبات عنوان المصفوفة في الذاكرة)
+  const items = useMemo(() => currentGroup?.items ?? [], [currentGroup]);
 
-  const saveChanges = (newItems) => {
-    updateGroup(groupId, newItems);
-  };
+  // ✅ 3. حسابات الشبكة (ثقيلة وتستحق useMemo)
+  const { numColumns, dynamicCardWidth } = useMemo(() => {
+    const availableWidth = width - SCREEN_PADDING * 2;
+    // الحساب بناءً على 135px
+    const calculatedColumns = Math.floor(availableWidth / MIN_CARD_WIDTH);
+    const cols = isGridLayout ? Math.max(2, calculatedColumns) : 1;
 
-  // ✅ بالإضافة الجديدة: دالة التحريك (فوق / تحت)
-  const handleMove = (index, direction) => {
-    const newItems = [...items];
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    // توزيع الفراغات بدقة
+    const totalGapSpace = (cols - 1) * GAP_SIZE;
+    const widthForCards = availableWidth - totalGapSpace;
+    const cardWidth = widthForCards / cols - CARD_MARGIN * 2;
 
-    // حماية الحدود (كي لا يخرج عن المصفوفة)
-    if (targetIndex < 0 || targetIndex >= newItems.length) return;
+    return { numColumns: cols, dynamicCardWidth: cardWidth };
+  }, [width, isGridLayout]);
 
-    // عملية التبديل (Swap)
-    [newItems[index], newItems[targetIndex]] = [
-      newItems[targetIndex],
-      newItems[index],
-    ];
+  // ✅ 4. ستايل الصفوف (لتجنب إنشاء كائن جديد كل مرة)
+  const columnWrapperStyle = useMemo(
+    () => (isGridLayout ? GRID_COLUMN_WRAPPER_STYLE : null),
+    [isGridLayout],
+  );
 
-    // حفظ الترتيب الجديد
-    saveChanges(newItems);
-  };
+  // ── دوال التفاعل (Handlers) ──
 
-  const openAddModal = () => {
-    setEditingItem(null);
-    setModalVisible(true);
-  };
+  const saveChanges = useCallback(
+    (newItems) => {
+      if (groupId) updateGroup(groupId, newItems);
+    },
+    [groupId, updateGroup],
+  );
 
-  const openEditModal = (item) => {
-    setEditingItem(item);
-    setModalVisible(true);
-  };
-
-  const handleModalSubmit = (data) => {
-    const { name, step, target, color } = data;
-
-    const duplicateName = checkDuplicateName(name, items, editingItem?.id);
-
-    if (duplicateName) {
-      Alert.alert(TEXTS.alertError, "This item name already exists!");
-      return;
-    }
-
-    let updatedList;
-
-    if (!editingItem) {
-      const newItem = {
-        id: generateId(),
-        name: name,
-        count: 0,
-        step: validateStep(step),
-        target: target,
-        color: color,
-      };
-      updatedList = [newItem, ...items];
-    } else {
-      updatedList = items.map((item) => {
-        if (item.id === editingItem.id) {
-          return { ...item, name, step, target, color };
-        }
-        return item;
+  // ✅ دالة الزيادة (مفصولة ومستقرة)
+  const handleIncrement = useCallback(
+    (itemId) => {
+      const updatedList = items.map((item) => {
+        if (item.id !== itemId) return item;
+        const step = item.step || 1;
+        // شرط الهدف (اختياري، يمكن تفعيله هنا)
+        // if (item.target > 0 && item.count >= item.target) return item;
+        return { ...item, count: item.count + step };
       });
-    }
+      saveChanges(updatedList);
+    },
+    [items, saveChanges],
+  );
 
-    saveChanges(updatedList);
-    setModalVisible(false);
-  };
+  // ✅ دالة النقصان (مفصولة ومستقرة)
+  const handleDecrement = useCallback(
+    (itemId) => {
+      const updatedList = items.map((item) => {
+        if (item.id !== itemId) return item;
+        const step = item.step || 1;
+        return { ...item, count: Math.max(0, item.count - step) };
+      });
+      saveChanges(updatedList);
+    },
+    [items, saveChanges],
+  );
 
-  const handleUpdate = (itemId, type) => {
-    const updatedList = items.map((item) => {
-      if (item.id !== itemId) return item;
-      if (type === "inc")
-        return { ...item, count: item.count + (item.step || 1) };
-      if (type === "dec")
-        return { ...item, count: Math.max(0, item.count - (item.step || 1)) };
-      return item;
-    });
-
-    if (type === "reset") {
+  // ✅ دالة التصفير
+  const handleReset = useCallback(
+    (itemId) => {
       const item = items.find((i) => i.id === itemId);
       Alert.alert(
         TEXTS.resetAlertTitle,
         TEXTS.resetMessage
-          ? TEXTS.resetMessage(item.name)
+          ? TEXTS.resetMessage(item?.name)
           : TEXTS.resetAlertMsg,
         [
           { text: TEXTS.cancelBtn, style: "cancel" },
@@ -145,41 +147,175 @@ export default function DashboardScreen({ route, navigation }) {
             text: TEXTS.confirmBtn,
             onPress: () => {
               const resetList = items.map((i) =>
-                i.id === itemId ? { ...i, count: 0 } : i
+                i.id === itemId ? { ...i, count: 0 } : i,
               );
               saveChanges(resetList);
             },
           },
-        ]
+        ],
       );
-      return;
-    }
-    saveChanges(updatedList);
-  };
+    },
+    [items, saveChanges],
+  );
 
-  const handleDelete = (itemId) => {
-    const filteredList = items.filter((i) => i.id !== itemId);
-    saveChanges(filteredList);
-  };
+  const handleDelete = useCallback(
+    (itemId) => {
+      Alert.alert(TEXTS.deleteItemTitle, TEXTS.deleteItemMsg, [
+        { text: TEXTS.cancelBtn, style: "cancel" },
+        {
+          text: TEXTS.deleteBtn,
+          style: "destructive",
+          onPress: () => {
+            const filteredList = items.filter((i) => i.id !== itemId);
+            saveChanges(filteredList);
+          },
+        },
+      ]);
+    },
+    [items, saveChanges],
+  );
 
-  // 📏 إعدادات القياسات
-  const SCREEN_PADDING = 10; // المسافة الجانبية للشاشة (من الستايل contentContainerStyle)
-  const CARD_MARGIN = 4; // المارجن حول الكارت الواحد (لازم يطابق الموجود في CounterCard)
-  const MIN_CARD_WIDTH = 145; // أقل عرض مسموح للكارت (عشان الأزرار ما تخرب)
+  const handleMove = useCallback(
+    (index, direction) => {
+      const newItems = [...items];
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newItems.length) return;
+      [newItems[index], newItems[targetIndex]] = [
+        newItems[targetIndex],
+        newItems[index],
+      ];
+      saveChanges(newItems);
+    },
+    [items, saveChanges],
+  );
 
-  // 🧮 1. حساب المساحة الصافية المتاحة للكروت
-  const availableWidth = width - SCREEN_PADDING * 2;
+  // ── المودال (إضافة / تعديل) ──
+  const openAddModal = useCallback(() => {
+    setEditingItem(null);
+    setModalVisible(true);
+  }, []);
 
-  // 🧮 2. حساب عدد الأعمدة المناسب (بدون كسور)
-  const calculatedColumns = Math.floor(availableWidth / MIN_CARD_WIDTH);
+  const openEditModal = useCallback((item) => {
+    setEditingItem(item);
+    setModalVisible(true);
+  }, []);
 
-  // في وضع الشبكة: عالأقل عمودين، وفي القائمة: عمود واحد
-  const numColumns = isGridLayout ? Math.max(2, calculatedColumns) : 1;
+  const handleModalSubmit = useCallback(
+    (data) => {
+      const { name, step, target, color } = data;
+      if (checkDuplicateName(name, items, editingItem?.id)) {
+        Alert.alert(TEXTS.alertError, "This item name already exists!");
+        return;
+      }
 
-  // 🧮 3. حساب عرض الكارت الواحد لملء الفراغ بالتساوي
-  // المعادلة: (المساحة الكلية / عدد الأعمدة) - (هامش الكارت يمين ويسار)
-  const dynamicCardWidth = availableWidth / numColumns - CARD_MARGIN * 2;
+      let updatedList;
+      if (!editingItem) {
+        const newItem = {
+          id: generateId(),
+          name,
+          count: 0,
+          step: validateStep(step),
+          target,
+          color,
+        };
+        updatedList = [newItem, ...items];
+      } else {
+        updatedList = items.map((item) =>
+          item.id === editingItem.id
+            ? { ...item, name, step, target, color }
+            : item,
+        );
+      }
+      saveChanges(updatedList);
+      setModalVisible(false);
+    },
+    [items, editingItem, saveChanges],
+  );
 
+  // ── 🛡️ حماية الخروج (Navigation Guard) ──
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      const isSessionActive = timerRef.current?.isSessionActive();
+
+      if (!isSessionActive) {
+        return; // اسمح بالخروج
+      }
+
+      // أوقف الخروج
+      e.preventDefault();
+
+      Alert.alert(
+        "Session Active ⚠️",
+        "A timer is running. Stop and save before leaving?",
+        [
+          { text: "Stay", style: "cancel", onPress: () => {} },
+          {
+            text: "Stop & Leave",
+            style: "destructive",
+            onPress: () => {
+              // إيقاف التايمر برمجياً
+              timerRef.current?.requestStop();
+              // تنفيذ الخروج يدوياً
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ],
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // ── Render Item (محسن للأداء) ──
+  const renderItem = useCallback(
+    ({ item, index }) => (
+      <CounterCard
+        item={item}
+        cardWidth={dynamicCardWidth}
+        // 👇 هنا نمرر الدوال المفصولة (Wiring الصحيح)
+        onIncrement={handleIncrement}
+        onDecrement={handleDecrement}
+        onReset={handleReset}
+        onDelete={handleDelete}
+        onEdit={openEditModal}
+        onMoveUp={handleMove}
+        onMoveDown={handleMove}
+        index={index}
+        isFirst={index === 0}
+        isLast={index === items.length - 1}
+        showOrderButtons={!isGridLayout}
+      />
+    ),
+    [
+      dynamicCardWidth,
+      handleIncrement, // ✅ دالة ثابتة
+      handleDecrement, // ✅ دالة ثابتة
+      handleReset,
+      handleDelete,
+      openEditModal,
+      handleMove,
+      items.length,
+      isGridLayout,
+    ],
+  );
+
+  // ── التحقق من وجود المجموعة ──
+  if (!currentGroup) {
+    return (
+      <View style={[localStyles.centerContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#999" />
+        <Text style={localStyles.errorText}>Group not found!</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={localStyles.backButton}
+        >
+          <Text>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── الواجهة الرئيسية ──
   return (
     <View style={localStyles.container}>
       <View style={[localStyles.header, { paddingTop: insets.top + 10 }]}>
@@ -210,56 +346,41 @@ export default function DashboardScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </View>
-      {/* 2. المؤقت الجديد (الطبقة الوسطى) */}
+
+      {/* ✅ ربط التايمر بالريموت */}
       <SessionTimer
-        onStart={() => console.log("Session Started!")}
+        ref={timerRef}
+        onStart={() => console.log("Session Started")}
         onStop={(duration) => {
-          console.log("Session Ended. Duration:", duration);
-          // هنا سنضيف لاحقاً كود الحفظ في السجل
+          console.log("Session Ended:", duration);
+          // 💡 لاحقاً: كود الحفظ في قاعدة البيانات هنا
         }}
       />
 
       <FlatList
+        // ✅ مفتاح لتغيير التخطيط (يمنع مشاكل الأعمدة في أندرويد)
         key={isGridLayout ? `grid-${numColumns}` : "list"}
         data={items}
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
-        // ✅ التعديل هنا: استقبال index وتمرير دوال التحريك
-        renderItem={({ item, index }) => (
-          <CounterCard
-            item={item}
-            cardWidth={dynamicCardWidth}
-            onIncrement={() => handleUpdate(item.id, "inc")}
-            onDecrement={() => handleUpdate(item.id, "dec")}
-            onReset={() => handleUpdate(item.id, "reset")}
-            onDelete={() => handleDelete(item.id)}
-            onEdit={() => openEditModal(item)}
-            // 👇 الإضافات الجديدة الخاصة بالترتيب
-            onMoveUp={() => handleMove(index, "up")}
-            onMoveDown={() => handleMove(index, "down")}
-            isFirst={index === 0}
-            isLast={index === items.length - 1}
-            showOrderButtons={!isGridLayout} // نخفي الأزرار في وضع الشبكة
-          />
-        )}
-        ListEmptyComponent={
-          <View style={localStyles.emptyContainer}>
-            <Text style={localStyles.emptyText}>{TEXTS.noItems}</Text>
-            <Text style={localStyles.emptySubText}>{TEXTS.startItemMsg}</Text>
-          </View>
-        }
-        contentContainerStyle={{ padding: 10, paddingBottom: 120 }}
-        columnWrapperStyle={
-          isGridLayout ? { justifyContent: "flex-start" } : null
-        }
+        renderItem={renderItem}
+        ListEmptyComponent={EmptyList}
+        contentContainerStyle={CONTENT_CONTAINER_STYLE}
+        columnWrapperStyle={columnWrapperStyle}
+        // تحسينات أداء إضافية للقوائم الطويلة
+        initialNumToRender={12}
+        windowSize={5}
       />
 
-      <TouchableOpacity
-        style={[localStyles.fab, { backgroundColor: COLORS.secondary }]}
-        onPress={openAddModal}
-      >
+      <TouchableOpacity style={localStyles.fab} onPress={openAddModal}>
         <Ionicons name="add" size={30} color="#fff" />
-        <Text style={localStyles.fabLabel}>{TEXTS.addItemBtn}</Text>
+        <Text
+          style={localStyles.fabLabel}
+          numberOfLines={1}
+          adjustsFontSizeToFit={true}
+        >
+          {TEXTS.addItemBtn}
+        </Text>
       </TouchableOpacity>
 
       <InputModal
@@ -279,6 +400,7 @@ export default function DashboardScreen({ route, navigation }) {
 
 const localStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
+  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: { backgroundColor: COLORS.primary, paddingBottom: 15, elevation: 5 },
   headerTopRow: {
     flexDirection: "row",
@@ -290,6 +412,13 @@ const localStyles = StyleSheet.create({
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   headerInfo: { color: "#fff", fontSize: 11, opacity: 0.8, marginBottom: 2 },
   iconButton: { padding: 5 },
+  errorText: { fontSize: 18, color: "#666", marginTop: 10 },
+  backButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: "#eee",
+    borderRadius: 8,
+  },
   fab: {
     position: "absolute",
     bottom: 30,
@@ -297,11 +426,21 @@ const localStyles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
+    backgroundColor: COLORS.secondary,
     justifyContent: "center",
     alignItems: "center",
     elevation: 8,
+    padding: 4,
   },
-  fabLabel: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  fabLabel: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+    width: "100%",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
   emptyContainer: { alignItems: "center", marginTop: 100 },
   emptyText: { fontSize: 16, color: "#888", fontWeight: "bold" },
   emptySubText: { fontSize: 13, color: "#aaa", marginTop: 5 },

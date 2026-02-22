@@ -11,6 +11,7 @@ import AppNavigator from "./src/navigation/AppNavigator";
 // استيراد الألوان عشان الـ StatusBar
 import { COLORS } from "./src/constants/colors";
 export default function App() {
+  console.log("🦅 Is Hermes Running?", !!global.HermesInternal);
   return (
     // 1. نظام الحركات
     <GestureHandlerRootView style={{ flex: 1 }}>
