@@ -1,4 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
+import { StorageService } from "../services/storageService";
+import { buildSessionRecord } from "../utils/sessionUtils";
 
 export const useSessionManager = (items, groupData, userData) => {
   const initialSnapshot = useRef(null);
@@ -28,57 +30,22 @@ export const useSessionManager = (items, groupData, userData) => {
         return null;
       }
 
-      const sessionChanges = [];
-      const currentItems = latestItemsRef.current;
-      const initialItems = initialSnapshot.current;
-
-      // 1️⃣ Check existing and deleted items
-      initialItems.forEach((oldItem) => {
-        const currentItem = currentItems.find((i) => i.id === oldItem.id);
-        const finalCount = currentItem ? currentItem.count : oldItem.count;
-        const addedAmount = finalCount - oldItem.count;
-
-        if (addedAmount > 0) {
-          sessionChanges.push({
-            itemId: oldItem.id,
-            itemName: oldItem.name,
-            addedAmount: addedAmount,
-            status: currentItem ? "active" : "deleted_during_session",
-          });
-        }
-      });
-
-      // 2️⃣ Check brand new items added during the session
-      currentItems.forEach((currentItem) => {
-        const isNew = !initialItems.find((i) => i.id === currentItem.id);
-        if (isNew && currentItem.count > 0) {
-          sessionChanges.push({
-            itemId: currentItem.id,
-            itemName: currentItem.name,
-            addedAmount: currentItem.count,
-            status: "added_during_session",
-          });
-        }
-      });
-
-      // 🚀 Prepare the final payload (intended for future Supabase upload)
-      const sessionRecord = {
-        sessionId: Date.now().toString(),
-        workerName: userData?.name || "Unknown Worker",
-        groupId: groupData?.id || "no_group_id",
-        groupName: groupData?.name || "Unknown Group",
+      // Build the production record by diffing start snapshot vs current items
+      const sessionRecord = buildSessionRecord({
+        snapshot: initialSnapshot.current,
+        currentItems: latestItemsRef.current,
+        workerName: userData?.name,
+        groupId: groupData?.id,
+        groupName: groupData?.name,
         startTime: sessionStartTime.current,
-        endTime: new Date().toISOString(),
         durationSeconds: durationInSeconds,
-        production: sessionChanges,
-        deletedDuringSession: initialItems // Items removed during the session
-          .filter((old) => !currentItems.find((c) => c.id === old.id))
-          .map((item) => ({
-            itemId: item.id,
-            itemName: item.name,
-            count: item.count,
-          })),
-      };
+        status: "completed",
+      });
+
+      // Persist the completed session locally (source for future Supabase sync)
+      StorageService.appendSessionLog(sessionRecord).catch((e) =>
+        console.error("Failed to save session log", e),
+      );
 
       console.log(
         "📦 Final Session Record:\n",
