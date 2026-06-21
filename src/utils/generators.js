@@ -1,15 +1,15 @@
 // src/utils/generators.js
 import { COLORS } from '../constants/colors';
 
-// توليد ID فريد (بسيط وموحد)
+// Generate a unique ID (simple and consistent)
 export const generateId = () => Date.now().toString();
 
-// اختيار لون عشوائي من الباليت
+// Pick a random color from the palette
 export const getRandomColor = () => {
   return COLORS.palette[Math.floor(Math.random() * COLORS.palette.length)];
 };
 
-// تنسيق اسم الجهاز
+// Format a device name
 export const getDeviceName = (device) => {
   if (device?.modelName && device?.brand) {
     const brand = device.brand.charAt(0).toUpperCase() + device.brand.slice(1);

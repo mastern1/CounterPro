@@ -13,18 +13,18 @@ import { generateId, getRandomColor } from "../utils/generators";
 export const ProjectContext = createContext();
 
 export const ProjectProvider = ({ children }) => {
-  // ─── 1. الحالة (State) ───
+  // ─── 1. State ───
   const [groups, setGroups] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isGridLayout, setIsGridLayout] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── 2. المراجع (Refs) ───
+  // ─── 2. Refs ───
   const saveTimeoutRef = useRef(null);
   const appState = useRef(AppState.currentState);
   const previousGroupsRef = useRef(null);
 
-  // ─── 3. التحميل الأولي ───
+  // ─── 3. Initial load ───
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -42,7 +42,7 @@ export const ProjectProvider = ({ children }) => {
     initApp();
   }, []);
 
-  // ─── 4. المنطق الذكي للحفظ (Smart Save) ───
+  // ─── 4. Smart Save logic ───
   useEffect(() => {
     if (isLoading) return;
     const groupsString = JSON.stringify(groups);
@@ -78,23 +78,23 @@ export const ProjectProvider = ({ children }) => {
     };
   }, [groups, isLoading]);
 
-  // ─── 5. حفظ التخطيط ───
+  // ─── 5. Persist layout ───
   useEffect(() => {
     if (!isLoading) {
       StorageService.saveLayout(isGridLayout);
     }
   }, [isGridLayout, isLoading]);
 
-  // ─── 6. الدوال المحسنة (Optimized Functions) ───
+  // ─── 6. Optimized functions ───
 
-  // ✅ تسجيل الدخول
+  // Login
   const loginUser = useCallback(async (name, deviceId) => {
     const user = { name, deviceId, loginTime: new Date().toISOString() };
     setUserData(user);
     await StorageService.saveUser(user);
   }, []);
 
-  // ✅ تسجيل الخروج
+  // Logout
   const logoutUser = useCallback(async () => {
     const success = await StorageService.clearAll();
     if (success) {
@@ -104,12 +104,12 @@ export const ProjectProvider = ({ children }) => {
     }
   }, []);
 
-  // ✅ تغيير التخطيط
+  // Toggle layout
   const toggleLayout = useCallback(() => {
     setIsGridLayout((prev) => !prev);
   }, []);
 
-  // ✅ إضافة مجموعة (استخدام prev يمنع الاعتماد على groups)
+  // Add group (using prev avoids depending on groups)
   const addNewGroup = useCallback(
     (name) => {
       if (!userData) return;
@@ -120,37 +120,34 @@ export const ProjectProvider = ({ children }) => {
         createdAt: new Date().toISOString(),
         createdBy: userData.name,
         deviceId: userData.deviceId,
-        isDeleted: false,
         items: [],
       };
       setGroups((prev) => [newGroup, ...prev]);
     },
     [userData],
-  ); // userData نادراً ما يتغير
+  ); // userData rarely changes
 
-  // ✅ تعديل مجموعة
+  // Edit group
   const editGroup = useCallback((groupId, newName) => {
     setGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, name: newName } : g)),
     );
   }, []);
 
-  // ✅ حذف مجموعة
+  // Delete group
   const deleteGroup = useCallback((groupId) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.id === groupId ? { ...g, isDeleted: true } : g)),
-    );
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
   }, []);
 
-  // ✅ تحديث عناصر مجموعة
+  // Update a group's items
   const updateGroup = useCallback((groupId, newItems) => {
     setGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, items: newItems } : g)),
     );
   }, []);
 
-  // ─── 7. القيمة النهائية (Memoized Value) ───
-  // 🔥 هذا هو الدرع الحقيقي للأداء
+  // ─── 7. Final memoized value ───
+  // This is the real performance shield
   const contextValue = useMemo(
     () => ({
       groups,

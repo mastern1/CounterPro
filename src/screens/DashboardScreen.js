@@ -28,21 +28,22 @@ import { TEXTS } from "../constants/translations";
 import { ProjectContext } from "../context/ProjectContext";
 import { generateId } from "../utils/generators";
 import { checkDuplicateName, validateStep } from "../utils/validation";
+import * as Haptics from "expo-haptics";
 
-// ── 1. ثوابت خارج الكومبوننت (تحسين الأداء) ──────────────────────────
+// ── 1. Constants outside the component (performance) ─────────────────
 const GAP_SIZE = 8;
 const SCREEN_PADDING = 10;
 const CARD_MARGIN = 3;
-const MIN_CARD_WIDTH = 110; // 👈 الرقم الذهبي للتابلت (4 أعمدة)
+const MIN_CARD_WIDTH = 110; // The sweet spot for tablets (4 columns)
 
-// ── 2. ستايلات ثابتة للقوائم ─────────────────────────────────────────
+// ── 2. Static list styles ────────────────────────────────────────────
 const CONTENT_CONTAINER_STYLE = { padding: SCREEN_PADDING, paddingBottom: 120 };
 const GRID_COLUMN_WRAPPER_STYLE = {
   justifyContent: "flex-start",
   gap: GAP_SIZE,
 };
 
-// ── 3. مكون القائمة الفارغة (Static) ─────────────────────────────────
+// ── 3. Empty list component (static) ─────────────────────────────────
 const EmptyList = () => (
   <View style={localStyles.emptyContainer}>
     <Text style={localStyles.emptyText}>{TEXTS.noItems}</Text>
@@ -51,11 +52,11 @@ const EmptyList = () => (
 );
 
 export default function DashboardScreen({ route, navigation }) {
-  // ── Hooks الأساسية ──
+  // ── Core hooks ──
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const timerRef = useRef(null); // 👈 ريموت كنترول للتايمر
+  const timerRef = useRef(null); // Remote control for the timer
 
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -64,34 +65,30 @@ export default function DashboardScreen({ route, navigation }) {
     useContext(ProjectContext);
   const { groupId, groupName } = route?.params || {};
 
-  // ── الحسابات والبيانات ──
+  // ── Computed data ──
 
-  // ✅ 1. البحث عن المجموعة (useMemo ضروري هنا)
+  // 1. Find the group (useMemo is necessary here)
   const currentGroup = useMemo(
     () => groups.find((g) => g.id === groupId),
     [groups, groupId],
   );
 
-  // ✅ 2. العناصر (نستخدم useMemo لضمان ثبات عنوان المصفوفة في الذاكرة)
+  // 2. Items (useMemo keeps the array reference stable in memory)
   const items = useMemo(() => currentGroup?.items ?? [], [currentGroup]);
   const { startSession, endSession } = useSessionManager(
     items,
     { id: groupId, name: groupName },
     { name: userData?.name },
   );
-  const visibleItems = useMemo(
-    () => items.filter((i) => !i.isDeleted),
-    [items],
-  );
 
-  // ✅ 3. حسابات الشبكة (ثقيلة وتستحق useMemo)
+  // 3. Grid calculations (heavy enough to deserve useMemo)
   const { numColumns, dynamicCardWidth } = useMemo(() => {
     const availableWidth = width - SCREEN_PADDING * 2;
-    // الحساب بناءً على 135px
+    // Calculation based on MIN_CARD_WIDTH
     const calculatedColumns = Math.floor(availableWidth / MIN_CARD_WIDTH);
     const cols = isGridLayout ? Math.max(2, calculatedColumns) : 1;
 
-    // توزيع الفراغات بدقة
+    // Distribute the gaps precisely
     const totalGapSpace = (cols - 1) * GAP_SIZE;
     const widthForCards = availableWidth - totalGapSpace;
     const cardWidth = widthForCards / cols - CARD_MARGIN * 2;
@@ -99,13 +96,13 @@ export default function DashboardScreen({ route, navigation }) {
     return { numColumns: cols, dynamicCardWidth: cardWidth };
   }, [width, isGridLayout]);
 
-  // ✅ 4. ستايل الصفوف (لتجنب إنشاء كائن جديد كل مرة)
+  // 4. Row style (avoid creating a new object each time)
   const columnWrapperStyle = useMemo(
     () => (isGridLayout ? GRID_COLUMN_WRAPPER_STYLE : null),
     [isGridLayout],
   );
 
-  // ── دوال التفاعل (Handlers) ──
+  // ── Handlers ──
 
   const saveChanges = useCallback(
     (newItems) => {
@@ -114,13 +111,22 @@ export default function DashboardScreen({ route, navigation }) {
     [groupId, updateGroup],
   );
 
-  // ✅ دالة الزيادة (مفصولة ومستقرة)
+  // Increment (separated and stable)
   const handleIncrement = useCallback(
     (itemId) => {
+      const isSessionActive = timerRef.current?.isSessionActive();
+      if (!isSessionActive) {
+        Alert.alert(
+          "Session Inactive",
+          "Please start the timer before making changes.",
+          [{ text: "Cancel", style: "cancel" }],
+        );
+        return;
+      }
       const updatedList = items.map((item) => {
         if (item.id !== itemId) return item;
         const step = item.step || 1;
-        // شرط الهدف (اختياري، يمكن تفعيله هنا)
+        // Optional target guard can be enabled here:
         // if (item.target > 0 && item.count >= item.target) return item;
         return { ...item, count: item.count + step };
       });
@@ -129,9 +135,18 @@ export default function DashboardScreen({ route, navigation }) {
     [items, saveChanges],
   );
 
-  // ✅ دالة النقصان (مفصولة ومستقرة)
+  // Decrement (separated and stable)
   const handleDecrement = useCallback(
     (itemId) => {
+      const isSessionActive = timerRef.current?.isSessionActive();
+      if (!isSessionActive) {
+        Alert.alert(
+          "Session Inactive",
+          "Please start the timer before making changes.",
+          [{ text: "Cancel", style: "cancel" }],
+        );
+        return;
+      }
       const updatedList = items.map((item) => {
         if (item.id !== itemId) return item;
         const step = item.step || 1;
@@ -142,9 +157,18 @@ export default function DashboardScreen({ route, navigation }) {
     [items, saveChanges],
   );
 
-  // ✅ دالة التصفير
+  // Reset
   const handleReset = useCallback(
     (itemId) => {
+      const isSessionActive = timerRef.current?.isSessionActive();
+      if (!isSessionActive) {
+        Alert.alert(
+          "Session Inactive",
+          "Please start the timer before making changes.",
+          [{ text: "Cancel", style: "cancel" }],
+        );
+        return;
+      }
       const item = items.find((i) => i.id === itemId);
       Alert.alert(
         TEXTS.resetAlertTitle,
@@ -170,10 +194,33 @@ export default function DashboardScreen({ route, navigation }) {
 
   const handleDelete = useCallback(
     (itemId) => {
-      const softDeletedList = items.map((i) =>
-        i.id === itemId ? { ...i, isDeleted: true } : i,
+      const isSessionActive = timerRef.current?.isSessionActive();
+      if (!isSessionActive) {
+        Alert.alert(
+          "Session Inactive",
+          "Please start the timer before making changes.",
+          [{ text: "Cancel", style: "cancel" }],
+        );
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        TEXTS.deleteTitle || "Delete",
+        TEXTS.deleteMessage
+          ? TEXTS.deleteMessage(items.find((i) => i.id === itemId)?.name)
+          : "Delete item?",
+        [
+          { text: TEXTS.cancelBtn || "Cancel", style: "cancel" },
+          {
+            text: TEXTS.deleteBtn || "Delete",
+            style: "destructive",
+            onPress: () => {
+              const filteredList = items.filter((i) => i.id !== itemId);
+              saveChanges(filteredList);
+            },
+          },
+        ],
       );
-      saveChanges(softDeletedList);
     },
     [items, saveChanges],
   );
@@ -192,7 +239,7 @@ export default function DashboardScreen({ route, navigation }) {
     [items, saveChanges],
   );
 
-  // ── المودال (إضافة / تعديل) ──
+  // ── Modal (add / edit) ──
   const openAddModal = useCallback(() => {
     setEditingItem(null);
     setModalVisible(true);
@@ -220,9 +267,8 @@ export default function DashboardScreen({ route, navigation }) {
           step: validateStep(step),
           target,
           color,
-          isDeleted: false,
         };
-        updatedList = [newItem, ...items];
+        updatedList = [...items, newItem];
       } else {
         updatedList = items.map((item) =>
           item.id === editingItem.id
@@ -236,16 +282,16 @@ export default function DashboardScreen({ route, navigation }) {
     [items, editingItem, saveChanges],
   );
 
-  // ── 🛡️ حماية الخروج (Navigation Guard) ──
+  // ── 🛡️ Exit guard (Navigation Guard) ──
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       const isSessionActive = timerRef.current?.isSessionActive();
 
       if (!isSessionActive) {
-        return; // اسمح بالخروج
+        return; // Allow leaving
       }
 
-      // أوقف الخروج
+      // Block leaving
       e.preventDefault();
 
       Alert.alert(
@@ -257,9 +303,9 @@ export default function DashboardScreen({ route, navigation }) {
             text: "Stop & Leave",
             style: "destructive",
             onPress: () => {
-              // إيقاف التايمر برمجياً
+              // Stop the timer programmatically
               timerRef.current?.requestStop();
-              // تنفيذ الخروج يدوياً
+              // Perform the exit manually
               navigation.dispatch(e.data.action);
             },
           },
@@ -270,13 +316,14 @@ export default function DashboardScreen({ route, navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  // ── Render Item (محسن للأداء) ──
+  // ── Render Item (performance optimized) ──
   const renderItem = useCallback(
     ({ item, index }) => (
       <CounterCard
         item={item}
+        index={index}
         cardWidth={dynamicCardWidth}
-        // 👇 هنا نمرر الدوال المفصولة (Wiring الصحيح)
+        // Pass the separated handlers (correct wiring)
         onIncrement={handleIncrement}
         onDecrement={handleDecrement}
         onReset={handleReset}
@@ -284,7 +331,6 @@ export default function DashboardScreen({ route, navigation }) {
         onEdit={openEditModal}
         onMoveUp={handleMove}
         onMoveDown={handleMove}
-        index={index}
         isFirst={index === 0}
         isLast={index === items.length - 1}
         showOrderButtons={!isGridLayout}
@@ -292,8 +338,8 @@ export default function DashboardScreen({ route, navigation }) {
     ),
     [
       dynamicCardWidth,
-      handleIncrement, // ✅ دالة ثابتة
-      handleDecrement, // ✅ دالة ثابتة
+      handleIncrement, // Stable function
+      handleDecrement, // Stable function
       handleReset,
       handleDelete,
       openEditModal,
@@ -303,7 +349,7 @@ export default function DashboardScreen({ route, navigation }) {
     ],
   );
 
-  // ── التحقق من وجود المجموعة ──
+  // ── Group existence check ──
   if (!currentGroup) {
     return (
       <View style={[localStyles.centerContainer, { paddingTop: insets.top }]}>
@@ -313,13 +359,13 @@ export default function DashboardScreen({ route, navigation }) {
           onPress={() => navigation.goBack()}
           style={localStyles.backButton}
         >
-          <Text>Go Back</Text>
+          <Text style={{ color: COLORS.textPrimary }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // ── الواجهة الرئيسية ──
+  // ── Main UI ──
   return (
     <View style={localStyles.container}>
       <View style={[localStyles.header, { paddingTop: insets.top + 10 }]}>
@@ -342,29 +388,37 @@ export default function DashboardScreen({ route, navigation }) {
             onPress={toggleLayout}
             style={localStyles.iconButton}
           >
-            <Ionicons
-              name={isGridLayout ? "list" : "grid"}
-              size={26}
-              color="#fff"
-            />
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#fff",
+                padding: 4,
+                borderRadius: 4,
+              }}
+            >
+              <Text style={{ color: "#000", fontSize: 12 }}>
+                {isGridLayout ? "List & edit" : "Grid View"}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ✅ ربط التايمر بالريموت */}
+      {/* Wire the timer to the remote control */}
       <SessionTimer ref={timerRef} onStart={startSession} onStop={endSession} />
 
       <FlatList
-        // ✅ مفتاح لتغيير التخطيط (يمنع مشاكل الأعمدة في أندرويد)
+        // Key changes on layout switch (prevents Android column issues)
         key={isGridLayout ? `grid-${numColumns}` : "list"}
-        data={visibleItems}
+        data={items}
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={EmptyList}
         contentContainerStyle={CONTENT_CONTAINER_STYLE}
         columnWrapperStyle={columnWrapperStyle}
-        // تحسينات أداء إضافية للقوائم الطويلة
+        // Extra performance tuning for long lists
         initialNumToRender={12}
         windowSize={5}
       />
@@ -381,6 +435,10 @@ export default function DashboardScreen({ route, navigation }) {
       </TouchableOpacity>
 
       <InputModal
+        key={editingItem?.id ?? "new"}
+        isEditing={!!editingItem}
+        onReset={() => handleReset(editingItem?.id)}
+        onDelete={() => handleDelete(editingItem?.id)}
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onSubmit={handleModalSubmit}
@@ -396,8 +454,13 @@ export default function DashboardScreen({ route, navigation }) {
 }
 
 const localStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
   header: { backgroundColor: COLORS.primary, paddingBottom: 15, elevation: 5 },
   headerTopRow: {
     flexDirection: "row",
@@ -405,15 +468,15 @@ const localStyles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 15,
   },
-  headerInfoContainer: { alignItems: "center" },
+  headerInfoContainer: { alignItems: "center", left: 8 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   headerInfo: { color: "#fff", fontSize: 11, opacity: 0.8, marginBottom: 2 },
-  iconButton: { padding: 5 },
-  errorText: { fontSize: 18, color: "#666", marginTop: 10 },
+  iconButton: { padding: 4 },
+  errorText: { fontSize: 18, color: COLORS.textSecondary, marginTop: 10 },
   backButton: {
     marginTop: 20,
     padding: 10,
-    backgroundColor: "#eee",
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
   },
   fab: {
@@ -439,6 +502,6 @@ const localStyles = StyleSheet.create({
     textAlignVertical: "center",
   },
   emptyContainer: { alignItems: "center", marginTop: 100 },
-  emptyText: { fontSize: 16, color: "#888", fontWeight: "bold" },
-  emptySubText: { fontSize: 13, color: "#aaa", marginTop: 5 },
+  emptyText: { fontSize: 16, color: COLORS.textSecondary, fontWeight: "bold" },
+  emptySubText: { fontSize: 13, color: COLORS.textSecondary, marginTop: 5 },
 });

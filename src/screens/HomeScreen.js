@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useContext, useState, useMemo, useCallback } from "react"; // ✅ إضافة الهوكس
+import { useContext, useState, useMemo, useCallback } from "react";
 import {
   Alert,
   FlatList,
@@ -23,19 +23,18 @@ const HomeScreen = ({ navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
 
-  // ✅ 1. تحسين الأداء: حساب المجموع فقط عند تغير المجموعات
+  // 1. Performance: recompute the total only when groups change
   const totalCounts = useMemo(() => {
-    return groups
-      .filter((g) => !g.isDeleted)
-      .reduce((total, group) => {
-        const groupTotal = (group.items || [])
-          .filter((item) => !item.isDeleted)
-          .reduce((gTotal, item) => gTotal + (item.count || 0), 0);
-        return total + groupTotal;
-      }, 0);
+    return groups.reduce((total, group) => {
+      const groupTotal = (group.items || []).reduce(
+        (gTotal, item) => gTotal + (item.count || 0),
+        0,
+      );
+      return total + groupTotal;
+    }, 0);
   }, [groups]);
 
-  // ✅ 2. تثبيت الدوال لمنع إعادة رسم الكروت
+  // 2. Stable callbacks to avoid re-rendering the cards
   const handlePressGroup = useCallback(
     (group) => {
       navigation.navigate("Dashboard", {
@@ -58,7 +57,7 @@ const HomeScreen = ({ navigation }) => {
       ]);
     },
     [deleteGroup],
-  ); // يعتمد على دالة Context الثابتة
+  ); // Depends on the stable Context function
 
   const handleUpdatedGroup = useCallback(
     (data) => {
@@ -94,7 +93,7 @@ const HomeScreen = ({ navigation }) => {
     ]);
   };
 
-  // ✅ 3. دالة رسم الكرت (مهمة جداً لـ FlatList)
+  // 3. Card renderer (important for FlatList)
   const renderItem = useCallback(
     ({ item }) => (
       <GroupCard
@@ -109,11 +108,6 @@ const HomeScreen = ({ navigation }) => {
       />
     ),
     [handlePressGroup, handleDeleteGroup],
-  );
-
-  const visibleGroups = useMemo(
-    () => groups.filter((g) => !g.isDeleted),
-    [groups],
   );
 
   return (
@@ -132,14 +126,14 @@ const HomeScreen = ({ navigation }) => {
             </Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-            <Ionicons name="log-out-outline" size={22} color="#D32F2F" />
+            <Ionicons name="log-out-outline" size={22} color="#EF5350" />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{visibleGroups.length}</Text>
+          <Text style={styles.statNumber}>{groups.length}</Text>
           <Text style={styles.statLabel}>{TEXTS.statsGroups}</Text>
         </View>
         <View style={styles.statCard}>
@@ -151,13 +145,13 @@ const HomeScreen = ({ navigation }) => {
       <Text style={styles.sectionTitle}>{TEXTS.groupsTitle}</Text>
 
       <FlatList
-        data={visibleGroups}
+        data={groups}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        renderItem={renderItem} // ✅ استخدام الدالة الثابتة
+        renderItem={renderItem}
         ListEmptyComponent={
           <View style={{ alignItems: "center", marginTop: 50 }}>
-            <Text style={{ color: "#999" }}>{TEXTS.noGroups}</Text>
+            <Text style={{ color: COLORS.textSecondary }}>{TEXTS.noGroups}</Text>
           </View>
         }
       />
@@ -170,6 +164,7 @@ const HomeScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <InputModal
+        key={editingGroupId ?? "new"}
         visible={modalVisible}
         onClose={() => {
           setModalVisible(false);
@@ -188,9 +183,8 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-// ... الستايلات تبقى كما هي ...
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -200,16 +194,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  greeting: { fontSize: 22, fontWeight: "bold", color: "#333" },
-  date: { fontSize: 14, color: "#666", marginTop: 2 },
+  greeting: { fontSize: 22, fontWeight: "bold", color: COLORS.textPrimary },
+  date: { fontSize: 14, color: COLORS.textSecondary, marginTop: 2 },
   deviceIdBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#e3f2fd",
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
   },
-  deviceIdText: { color: "#1a237e", fontWeight: "bold", fontSize: 12 },
-  logoutBtn: { padding: 8, backgroundColor: "#FFEBEE", borderRadius: 8 },
+  deviceIdText: { color: COLORS.accent, fontWeight: "bold", fontSize: 12 },
+  logoutBtn: { padding: 8, backgroundColor: "#3A1F22", borderRadius: 8 },
   statsContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -218,20 +212,20 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
     elevation: 2,
   },
-  statNumber: { fontSize: 24, fontWeight: "bold", color: "#1a237e" },
-  statLabel: { fontSize: 12, color: "#666", marginTop: 4 },
+  statNumber: { fontSize: 24, fontWeight: "bold", color: COLORS.accent },
+  statLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginHorizontal: 20,
     marginBottom: 10,
-    color: "#333",
+    color: COLORS.textPrimary,
   },
   fab: {
     position: "absolute",

@@ -4,14 +4,15 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { TEXTS as appStrings } from "../constants/translations";
 
-// ── 1. ثوابت الذاكرة (Memory Constants) ─────────────────────────────
-// إخراج هذه الكائنات يمنع إنشاءها من جديد عند كل ضغطة زر
+// ── 1. Memory constants ─────────────────────────────────────────────
+// Hoisting these objects avoids recreating them on every button press.
 const HIT_SLOP_SMALL = { top: 10, bottom: 10, left: 10, right: 10 };
 const HIT_SLOP_LARGE = { top: 15, bottom: 15, left: 15, right: 15 };
 const ACTIVE_OPACITY = 0.8;
 
 const CounterCard = ({
   item,
+  index,
   onIncrement,
   onDecrement,
   onReset,
@@ -25,11 +26,11 @@ const CounterCard = ({
   cardWidth,
   containerStyle,
 }) => {
-  // ── المنطق (Logic) ────────────────────────────────────────────────
+  // ── Logic ─────────────────────────────────────────────────────────
   const handleIncrement = () => {
     const targetValue = parseInt(item.target || 0);
 
-    // 1. فحص الهدف
+    // 1. Target check
     if (targetValue > 0 && item.count >= targetValue) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(
@@ -40,7 +41,7 @@ const CounterCard = ({
       return;
     }
 
-    // 2. الاهتزاز
+    // 2. Haptic feedback
     const stepValue = item.step || 1;
     const nextValue = item.count + stepValue;
 
@@ -50,7 +51,7 @@ const CounterCard = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    // 3. التنفيذ
+    // 3. Execute
     onIncrement(item.id);
   };
 
@@ -74,7 +75,7 @@ const CounterCard = ({
 
   const buttonText = `+${item.step || 1}`;
 
-  // تحضير الألوان والستايلات الديناميكية مرة واحدة
+  // Prepare dynamic colors/styles once
   const cardStyle = [
     styles.card,
     { width: cardWidth, backgroundColor: item.color || "#f0f8ff" },
@@ -85,18 +86,13 @@ const CounterCard = ({
 
   return (
     <View style={cardStyle}>
-      {/* ── Header ── */}
-      <View
-        style={[
-          styles.headerRow,
-          showOrderButtons ? styles.justifyBetween : styles.justifyCenter,
-        ]}
-      >
-        {showOrderButtons && (
+      {/* ── Header: shown only in List Mode ── */}
+      {showOrderButtons && (
+        <View style={styles.headerRow}>
           <View style={styles.orderingContainer}>
             {!isFirst && (
               <TouchableOpacity
-                onPress={() => onMoveUp(item.id, "up")}
+                onPress={() => onMoveUp(index, "up")}
                 style={styles.moveBtn}
                 hitSlop={HIT_SLOP_SMALL}
               >
@@ -105,7 +101,7 @@ const CounterCard = ({
             )}
             {!isLast && (
               <TouchableOpacity
-                onPress={() => onMoveDown(item.id, "down")}
+                onPress={() => onMoveDown(index, "down")}
                 style={styles.moveBtn}
                 hitSlop={HIT_SLOP_SMALL}
               >
@@ -117,37 +113,23 @@ const CounterCard = ({
               </TouchableOpacity>
             )}
           </View>
-        )}
-
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            onPress={() => onEdit(item)}
-            style={styles.iconButton}
-            hitSlop={HIT_SLOP_SMALL}
-          >
-            <Ionicons name="pencil" size={12} color="#999" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDeleteConfirm}
-            style={styles.iconButton}
-            hitSlop={HIT_SLOP_SMALL}
-          >
-            <Ionicons name="trash-outline" size={12} color="#FF5252" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => onReset(item.id)}
-            style={styles.iconButton}
-            hitSlop={HIT_SLOP_SMALL}
-          >
-            <Ionicons name="refresh" size={12} color="#999" />
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
-      {/* ── Title ── */}
-      <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
-        {item.name}
-      </Text>
+      {/* ── Title: tap the settings icon to edit ── */}
+      <View style={styles.headerRow}>
+        <Text style={styles.title} numberOfLines={1} allowFontScaling={false}>
+          {item.name}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => onEdit(item)}
+          hitSlop={HIT_SLOP_SMALL}
+        >
+          <Ionicons name="settings-outline" size={14} color="#999" />
+        </TouchableOpacity>
+      </View>
 
       {/* ── Center (Count) ── */}
       <View style={styles.centerSection}>
@@ -161,11 +143,11 @@ const CounterCard = ({
           </Text>
         )}
 
-        {/* زر الناقص */}
+        {/* Decrement button */}
         <TouchableOpacity
           style={styles.minusButtonBelow}
           onPress={() => onDecrement(item.id)}
-          hitSlop={HIT_SLOP_LARGE} // ✅ استخدام الثابت
+          hitSlop={HIT_SLOP_LARGE}
         >
           <Ionicons name="remove" size={18} color="#888" />
         </TouchableOpacity>
@@ -175,7 +157,7 @@ const CounterCard = ({
       <TouchableOpacity
         style={[styles.incrementButton, btnColor]}
         onPress={handleIncrement}
-        activeOpacity={ACTIVE_OPACITY} // ✅ استخدام الثابت
+        activeOpacity={ACTIVE_OPACITY}
       >
         <Text
           style={styles.incrementText}
@@ -191,6 +173,14 @@ const CounterCard = ({
 
 // ── Styles (Static) ─────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingHorizontal: 4,
+    gap: 4,
+  },
   card: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -213,20 +203,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     height: 20,
   },
-  // ✅ تعريف الـ Alignment كـ ستايل ثابت بدلاً من الشرط داخل الـ JSX
-  justifyBetween: { justifyContent: "space-between" },
-  justifyCenter: { justifyContent: "center" },
-
   orderingContainer: { flexDirection: "row", gap: 2 },
   actionsContainer: { flexDirection: "row", gap: 10 },
   iconButton: { padding: 2 },
   title: {
-    fontSize: 11,
+    fontSize: 18,
+    paddingLeft: 12,
     fontWeight: "600",
     color: "#555",
     marginBottom: 1,
     textAlign: "center",
-    width: "100%",
+    flex: 1,
   },
   centerSection: {
     alignItems: "center",
@@ -236,7 +223,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   countText: {
-    fontSize: 26,
+    fontSize: 35,
     fontWeight: "bold",
     color: "#000",
     textAlign: "center",
@@ -274,6 +261,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: "center",
   },
+  settingsBtn: { alignSelf: "flex-end", padding: 2, marginBottom: 2 },
 });
 
 CounterCard.displayName = "CounterCard";

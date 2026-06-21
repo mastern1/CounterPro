@@ -1,5 +1,5 @@
 import * as Device from "expo-device";
-import { useContext, useEffect, useState, useMemo } from "react"; // ✅ إضافة useMemo
+import { useContext, useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS } from "../constants/colors";
 import { TEXTS } from "../constants/translations";
 import { ProjectContext } from "../context/ProjectContext";
 
@@ -19,7 +20,7 @@ const WorkerIdentityScreen = ({ navigation }) => {
   const { loginUser, userData, isLoading } = useContext(ProjectContext);
   const [workerName, setWorkerName] = useState("");
 
-  // ✅ تحسين الأداء: حساب اسم الجهاز مرة واحدة فقط
+  // Performance: compute the device name only once
   const deviceId = useMemo(() => {
     if (Device.modelName && Device.brand) {
       const brand =
@@ -30,7 +31,7 @@ const WorkerIdentityScreen = ({ navigation }) => {
     return (
       Device.modelName || (Platform.OS === "ios" ? "iPhone" : "Generic Android")
     );
-  }, []); // [] تعني: احسبها مرة واحدة عند البداية ولا تكررها أبداً
+  }, []); // [] means: compute once at startup and never repeat
 
   useEffect(() => {
     if (!isLoading && userData) {
@@ -70,7 +71,7 @@ const WorkerIdentityScreen = ({ navigation }) => {
         style={styles.content}
       >
         <View style={styles.logoContainer}>
-          {/* ✅ إصلاح أندرويد 8: النصوص الكبيرة */}
+          {/* Older-Android fix: large text */}
           <Text style={styles.logoText} adjustsFontSizeToFit numberOfLines={1}>
             📦
           </Text>
@@ -90,7 +91,7 @@ const WorkerIdentityScreen = ({ navigation }) => {
             placeholder={TEXTS.namePlaceholder}
             value={workerName}
             onChangeText={setWorkerName}
-            placeholderTextColor="#999"
+            placeholderTextColor={COLORS.textSecondary}
           />
 
           <TouchableOpacity style={styles.button} onPress={handleStartWork}>
@@ -104,11 +105,11 @@ const WorkerIdentityScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#1a237e" },
+  container: { flex: 1, backgroundColor: COLORS.primary },
   content: { flex: 1, justifyContent: "center", padding: 20 },
   logoContainer: { alignItems: "center", marginBottom: 40, width: "100%" },
 
-  // 👇 ستايلات أندرويد 8 الخاصة
+  // Older-Android specific styles
   logoText: {
     fontSize: 80,
     marginBottom: 10,
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 30,
     elevation: 10,
@@ -134,29 +135,30 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#333",
+    color: COLORS.textPrimary,
     marginBottom: 5,
     textAlign: "center",
     width: "100%",
   },
   subLabel: {
     fontSize: 14,
-    color: "#666",
+    color: COLORS.textSecondary,
     marginBottom: 25,
     textAlign: "center",
   },
   input: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 15,
     fontSize: 16,
     textAlign: "center",
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#eee",
+    borderColor: COLORS.border,
+    color: COLORS.textPrimary,
   },
   button: {
-    backgroundColor: "#2e7d32",
+    backgroundColor: COLORS.secondary,
     padding: 18,
     borderRadius: 12,
     alignItems: "center",

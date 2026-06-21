@@ -1,6 +1,6 @@
 // src/constants/translations.js
 
-const LANGUAGE = 'en'; 
+const LANGUAGE = 'en';
 
 const textDatabase = {
   en: {
@@ -12,14 +12,14 @@ const textDatabase = {
     startButton: "Login & Start",
     alertName: "Please enter your name",
     alertError: "Alert",
-    
+
     // --- Home Screen ---
     greeting: "Hi, ",
     groupsTitle: "Work Groups",
     statsGroups: "Groups",
     statsCount: "Total Count",
     newGroupBtn: "Create",
-    cancelBtn: "Cancel", 
+    cancelBtn: "Cancel",
     newGroupTitle: "New Work Group",
     newGroupPlaceholder: "Project or Order Name",
     noGroups: "No work groups yet",
@@ -37,12 +37,12 @@ const textDatabase = {
     startItemMsg: "Press the green button to add an item",
     addItemBtn: "Add Item",
     newItemTitle: "New Counter Item",
-    
+
     // --- Shared Buttons & Actions ---
     cancel: "Cancel",
     delete: "Delete",
     confirm: "Confirm",
-    confirmBtn: "Confirm", // 👈 ✅ (جديد) أضفناه لأن الداش بورد تطلبه
+    confirmBtn: "Confirm", // Added because the Dashboard relies on it
     save: "Save",
     edit: "Edit",
 
@@ -51,19 +51,19 @@ const textDatabase = {
     itemStep: "Step (Increment)",
     itemTarget: "Target Goal (Optional)",
     itemTargetPlaceholder: "e.g. 100, 500...",
-    
-    goal: "Goal", 
-    step: "Step", 
-    
+
+    goal: "Goal",
+    step: "Step",
+
     // --- Alert Messages (Functions & Titles) ---
-    
+
     deleteTitle: "Delete Counter",
-    deleteMessage: (name) => `Are you sure you want to delete "${name}"?`, 
-    
-    // 👇 ✅ (تصحيح) وحدنا الأسماء مع الداش بورد
-    resetAlertTitle: "Reset Counter", 
+    deleteMessage: (name) => `Are you sure you want to delete "${name}"?`,
+
+    // Names unified with the Dashboard
+    resetAlertTitle: "Reset Counter",
     resetMessage: (name) => `Are you sure you want to reset "${name}" to zero?`,
-    resetAlertMsg: "Are you sure you want to reset this item?", // رسالة احتياطية
+    resetAlertMsg: "Are you sure you want to reset this item?", // Fallback message
   }
 };
 

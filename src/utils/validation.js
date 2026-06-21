@@ -14,7 +14,6 @@ export const validateName = (name) => {
 export const checkDuplicateName = (name, items, excludeId = null) => {
   return items.some(
     (i) =>
-      !i.isDeleted &&
       i.name.trim().toLowerCase() === name.trim().toLowerCase() &&
       i.id !== excludeId,
   );

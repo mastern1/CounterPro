@@ -4,7 +4,7 @@ import React, {
   useRef,
   forwardRef,
   useImperativeHandle,
-  useCallback, // ✅ أضفنا استيراد useCallback
+  useCallback,
 } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,17 +16,17 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
   const [isPaused, setIsPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
-  // 🎯 Refs (للحفاظ على القيم بدقة عالية)
+  // 🎯 Refs (keep high-precision values)
   const intervalRef = useRef(null);
   const startTimeRef = useRef(null);
   const pausedTimeRef = useRef(0);
   const pauseStartRef = useRef(null);
 
-  // 🛑 دالة الإيقاف المركزية (مغلفة بـ useCallback لضمان ثباتها)
+  // 🛑 Central stop function (wrapped in useCallback to keep it stable)
   const performStop = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
 
-    // ✅ تم التعديل: حساب الوقت النهائي بناءً على Date.now فقط (بدون الاعتماد على state المتغير)
+    // Compute final time from Date.now only (not from the changing state)
     let finalSeconds = 0;
 
     if (startTimeRef.current) {
@@ -42,19 +42,19 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
       );
     }
 
-    // إرسال النتيجة للأب
+    // Send the result to the parent
     if (onStop) onStop(finalSeconds);
 
-    // تصفير كل شيء
+    // Reset everything
     setIsActive(false);
     setIsPaused(false);
     setSeconds(0);
     startTimeRef.current = null;
     pausedTimeRef.current = 0;
     pauseStartRef.current = null;
-  }, [onStop]); // تعتمد فقط على onStop
+  }, [onStop]); // Depends only on onStop
 
-  // 🔗 فتح قناة الاتصال مع الأب (Dashboard)
+  // 🔗 Open the communication channel with the parent (Dashboard)
   useImperativeHandle(
     ref,
     () => ({
@@ -63,10 +63,10 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
         performStop();
       },
     }),
-    [isActive, performStop], // ✅ المصفوفة الآن صحيحة 100% وخالية من الأخطاء
+    [isActive, performStop],
   );
 
-  // 🕒 العداد (يعمل فقط للعرض، الحساب الفعلي يعتمد على Date.now)
+  // 🕒 The ticker (display only; the real calculation relies on Date.now)
   useEffect(() => {
     if (isActive && !isPaused) {
       intervalRef.current = setInterval(() => {
@@ -85,7 +85,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     };
   }, [isActive, isPaused]);
 
-  // تنسيق الوقت
+  // Format the time
   const formatTime = (totalSeconds) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -94,7 +94,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
   };
 
-  // ▶️ زر البدء
+  // ▶️ Start button
   const handleStartPress = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert("Start Session", "Ready to start counting?", [
@@ -114,7 +114,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     ]);
   };
 
-  // ⏸️ زر التوقف المؤقت
+  // ⏸️ Pause / resume button
   const togglePause = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!isPaused) {
@@ -129,7 +129,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     }
   };
 
-  // ⏹️ زر الإنهاء (من المستخدم)
+  // ⏹️ End button (user-triggered)
   const handleStopPress = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert("End Session", "Finish and save logs?", [
@@ -144,7 +144,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
     ]);
   };
 
-  // --- الواجهة ---
+  // --- UI ---
   if (!isActive) {
     return (
       <View style={styles.startContainer}>
@@ -167,7 +167,7 @@ const SessionTimer = forwardRef(({ onStart, onStop }, ref) => {
         <Ionicons
           name={isPaused ? "pause-circle-outline" : "timer-outline"}
           size={24}
-          color={isPaused ? "#FF9800" : "#0D47A1"}
+          color={isPaused ? "#FF9800" : "#90CAF9"}
         />
         <Text
           style={[styles.digitalClock, isPaused && styles.digitalClockPaused]}
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#E3F2FD",
+    backgroundColor: "#1E1E1E",
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -220,14 +220,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 5,
     borderWidth: 1,
-    borderColor: "#BBDEFB",
+    borderColor: "#333333",
     elevation: 2,
   },
   timeContainer: { flexDirection: "row", alignItems: "center", gap: 8 },
   digitalClock: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#0D47A1",
+    color: "#90CAF9",
     fontVariant: ["tabular-nums"],
   },
   digitalClockPaused: { color: "#FF9800" },

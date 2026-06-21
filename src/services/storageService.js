@@ -1,7 +1,7 @@
 // src/services/storageService.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// تعريف المفاتيح هنا فقط (سرية تامة داخل الخدمة)
+// Storage keys are defined here only (kept private inside the service)
 const KEYS = {
   DATA: '@counters_pro_data_v1',
   USER: '@counters_pro_session_v1',
@@ -9,7 +9,7 @@ const KEYS = {
 };
 
 export const StorageService = {
-  // 📥 جلب كل البيانات (للبداية)
+  // Load everything (used on startup)
   loadAll: async () => {
     try {
       const [groups, user, layout] = await Promise.all([
@@ -20,7 +20,7 @@ export const StorageService = {
       return {
         groups: groups ? JSON.parse(groups) : [],
         user: user ? JSON.parse(user) : null,
-        layout: layout ? JSON.parse(layout) : true // الافتراضي true
+        layout: layout ? JSON.parse(layout) : true // Default: true
       };
     } catch (error) {
       console.error('Storage Load Error:', error);
@@ -28,7 +28,7 @@ export const StorageService = {
     }
   },
 
-  // 💾 حفظ المجموعات
+  // Save groups
   saveGroups: async (groups) => {
     try {
       await AsyncStorage.setItem(KEYS.DATA, JSON.stringify(groups));
@@ -39,7 +39,7 @@ export const StorageService = {
     }
   },
 
-  // 👤 حفظ المستخدم
+  // Save user
   saveUser: async (user) => {
     try {
       await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
@@ -48,7 +48,7 @@ export const StorageService = {
     }
   },
 
-  // 🎨 حفظ التخطيط
+  // Save layout
   saveLayout: async (isGrid) => {
     try {
       await AsyncStorage.setItem(KEYS.LAYOUT, JSON.stringify(isGrid));
@@ -57,7 +57,7 @@ export const StorageService = {
     }
   },
 
-  // 🧹 مسح كل شيء (تسجيل خروج)
+  // Clear everything (logout)
   clearAll: async () => {
     try {
       await AsyncStorage.multiRemove([KEYS.DATA, KEYS.USER, KEYS.LAYOUT]);

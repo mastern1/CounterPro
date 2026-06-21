@@ -48,7 +48,7 @@ export const useSessionManager = (items, groupData, userData) => {
         }
       });
 
-      // 2️⃣ Check BRAND NEW items added during the session (Claude's golden touch ✨)
+      // 2️⃣ Check brand new items added during the session
       currentItems.forEach((currentItem) => {
         const isNew = !initialItems.find((i) => i.id === currentItem.id);
         if (isNew && currentItem.count > 0) {
@@ -61,7 +61,7 @@ export const useSessionManager = (items, groupData, userData) => {
         }
       });
 
-      // 🚀 Prepare the final payload for Supabase
+      // 🚀 Prepare the final payload (intended for future Supabase upload)
       const sessionRecord = {
         sessionId: Date.now().toString(),
         workerName: userData?.name || "Unknown Worker",
@@ -71,12 +71,8 @@ export const useSessionManager = (items, groupData, userData) => {
         endTime: new Date().toISOString(),
         durationSeconds: durationInSeconds,
         production: sessionChanges,
-        deletedDuringSession: initialItems // ✅ أضف هذا
-          .filter(
-            (old) =>
-              !currentItems.find((c) => c.id === old.id) ||
-              currentItems.find((c) => c.id === old.id)?.isDeleted,
-          )
+        deletedDuringSession: initialItems // Items removed during the session
+          .filter((old) => !currentItems.find((c) => c.id === old.id))
           .map((item) => ({
             itemId: item.id,
             itemName: item.name,
