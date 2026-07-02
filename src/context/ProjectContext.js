@@ -47,11 +47,11 @@ export const ProjectProvider = ({ children }) => {
     if (isLoading) return;
     const groupsString = JSON.stringify(groups);
     if (groupsString === previousGroupsRef.current) return;
-    previousGroupsRef.current = groupsString;
 
     const saveNow = async () => {
       try {
         await StorageService.saveGroups(groups);
+        previousGroupsRef.current = groupsString; // only mark "saved" once it actually is
         console.log("✅ Smart Save Executed");
       } catch (e) {
         console.error("❌ Save failed", e);

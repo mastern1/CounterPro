@@ -28,10 +28,13 @@ by running the app.
 ## Tech notes
 
 - Expo SDK 56, React 19, React Native 0.85, new architecture with `reactCompiler: true`
-  (see `app.json`). The README badge saying "SDK 54" is stale — trust `package.json`.
+  (see `app.json`). Because the React Compiler enforces the Rules of React, keep render
+  pure: no side effects, ref writes, or impure calls (`Date.now()`, `Math.random()`)
+  during render — `npm run lint` reports these as **errors**, not warnings.
 - Plain JavaScript (`.js`), not TypeScript, despite `typescript` being a dev dependency.
-- Code comments throughout the `src/` tree are in **Arabic**. Match the surrounding style;
-  English is fine for new comments.
+- Code comments across `src/` and `App.js` are in **English** (translated from the
+  original Arabic). Keep new comments in English.
+- The UI is **dark-only** — there is no light mode or theme toggle.
 
 ## Architecture
 
@@ -49,12 +52,24 @@ adding state.
 `src/services/storageService.js` is the only module that knows AsyncStorage keys
 (`@counters_pro_*`). The context never calls AsyncStorage directly except through
 `StorageService`. Saving is **debounced 500ms** and diffed against a `previousGroupsRef`
-JSON snapshot, plus a flush on `AppState` → background/inactive. When changing the data
-shape, update both the save path and `loadAll`.
+JSON snapshot, plus a flush on `AppState` → background/inactive. `previousGroupsRef` is
+only updated **after** `StorageService.saveGroups()` resolves successfully (not eagerly
+when the change is detected) — this keeps the ref an honest mirror of what's actually on
+disk, so a failed write is naturally retried on the next `groups` change instead of being
+silently marked as saved. When changing the data shape, update both the save path and
+`loadAll`.
+
+`StorageService` also persists completed sessions under a separate `SESSION_LOGS` key via
+`appendSessionLog` / `loadSessionLogs` (see Sessions below). These intentionally **survive
+logout** — `clearAll` only removes `DATA`/`USER`/`LAYOUT` — so unsynced records aren't lost
+before the planned Supabase upload.
 
 ### Navigation flow
 `src/navigation/AppNavigator.js` — native stack, headers hidden (each screen draws its
-own). Flow: `WorkerIdentity` → `Home` → `Dashboard`.
+own). Flow: `WorkerIdentity` → `Home` → `Dashboard`. The dark look is enforced at several
+layers to avoid a white flash on transitions: each screen's root background, the navigator
+`contentStyle`, a `DarkTheme` on `NavigationContainer` (in `App.js`), and
+`backgroundColor` in `app.json` (the last only takes effect in real builds, not Expo Go).
 - **WorkerIdentity**: name entry + device-name detection (`expo-device`); auto-redirects
   to Home if a saved user exists.
 - **Home**: group list, add/edit/delete groups, logout (clears all storage).
@@ -68,13 +83,20 @@ Counting only happens inside a session. Two pieces cooperate:
   `Date.now()` deltas (with pause accounting), not from interval ticks, so it stays
   accurate across re-renders. It fires `onStart` / `onStop(durationSeconds)`.
 - `src/hooks/useSessionManager.js` — snapshots item counts on `startSession`, and on
-  `endSession` diffs current vs. snapshot to build a `sessionRecord` (added/active/deleted
-  items, worker, group, duration). This record is the **payload shape intended for future
-  Supabase upload**; today it is only `console.log`ged. Don't delete it.
+  `endSession` builds a `sessionRecord` via the pure `buildSessionRecord()` helper in
+  `src/utils/sessionUtils.js` (diffs current vs. snapshot: added/active/deleted items,
+  worker, group, duration, `status`). On a clean end the record is **persisted locally**
+  through `StorageService.appendSessionLog` (the `SESSION_LOGS` store) and also returned
+  (though `SessionTimer` currently ignores the return value). This record is the payload
+  shape intended for future Supabase upload; `loadSessionLogs()` is the read side for that
+  sync. Keep `buildSessionRecord` pure — it's reusable for crash recovery later.
 
 Dashboard enforces the session gate: `handleIncrement/Decrement/Reset/Delete` all check
 `timerRef.current?.isSessionActive()` and alert if no session is running. A `beforeRemove`
-navigation guard blocks leaving while a timer runs.
+navigation guard blocks leaving while a timer runs. `handleIncrement` clamps the new count
+at `item.target` (when a target is set) so a `step` that doesn't evenly divide into the
+distance to the goal can't jump the count past it — the "goal reached" alert in
+`CounterCard` depends on the count never exceeding `target`.
 
 ### Layout / responsiveness
 Dashboard computes `numColumns` and card width dynamically from
@@ -86,8 +108,13 @@ work around Android column glitches — keep that pattern.
 - IDs come from `generateId()` in `src/utils/generators.js`, which returns
   `Date.now().toString()`. This can collide for items created in the same millisecond — be
   aware when adding rapid-creation flows.
-- Colors live in `src/constants/colors.js` (`COLORS.primary/secondary` are structural;
-  `COLORS.palette` is the pastel pool used by `getRandomColor`).
+- Colors live in `src/constants/colors.js`: brand tokens (`primary/secondary/accent/error`)
+  and dark-theme tokens (`background/surface/surfaceAlt/border/textPrimary/textSecondary`).
+  `COLORS.palette` is a **vibrant** Material pool used by `getRandomColor` for groups and
+  counter items. Counter cards don't hardcode text color — `CounterCard` resolves the card's
+  background once (`item.color || fallback`) and calls `getContrastText()` on that *same*
+  resolved value to pick black/white text, so the two can never disagree (including when
+  `item.color` is missing and the fallback background is used).
 - All user-facing strings go through `TEXTS` in `src/constants/translations.js` — add new
   copy there rather than hardcoding.
 - Name validation / duplicate checks: `src/utils/validation.js`

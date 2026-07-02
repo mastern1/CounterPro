@@ -126,9 +126,12 @@ export default function DashboardScreen({ route, navigation }) {
       const updatedList = items.map((item) => {
         if (item.id !== itemId) return item;
         const step = item.step || 1;
-        // Optional target guard can be enabled here:
-        // if (item.target > 0 && item.count >= item.target) return item;
-        return { ...item, count: item.count + step };
+        // Clamp at the target so a step overshoot can't jump past the goal.
+        const newCount =
+          item.target > 0
+            ? Math.min(item.count + step, item.target)
+            : item.count + step;
+        return { ...item, count: newCount };
       });
       saveChanges(updatedList);
     },

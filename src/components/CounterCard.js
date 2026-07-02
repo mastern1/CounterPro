@@ -10,6 +10,21 @@ const HIT_SLOP_SMALL = { top: 10, bottom: 10, left: 10, right: 10 };
 const HIT_SLOP_LARGE = { top: 15, bottom: 15, left: 15, right: 15 };
 const ACTIVE_OPACITY = 0.8;
 
+// Pick black or white text for best contrast on a given hex background.
+// Pure & deterministic — safe to call during render (React Compiler friendly).
+const getContrastText = (hex) => {
+  if (!hex) return "#FFFFFF";
+  const c = hex.replace("#", "");
+  const full =
+    c.length === 3 ? c.split("").map((x) => x + x).join("") : c;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  // Perceived luminance (0–1); bright backgrounds get dark text.
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#1A1A1A" : "#FFFFFF";
+};
+
 const CounterCard = ({
   item,
   index,
@@ -45,7 +60,7 @@ const CounterCard = ({
     const stepValue = item.step || 1;
     const nextValue = item.count + stepValue;
 
-    if (targetValue > 0 && nextValue === targetValue) {
+    if (targetValue > 0 && nextValue >= targetValue) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -76,12 +91,15 @@ const CounterCard = ({
   const buttonText = `+${item.step || 1}`;
 
   // Prepare dynamic colors/styles once
+  const bgColor = item.color || "#f0f8ff";
   const cardStyle = [
     styles.card,
-    { width: cardWidth, backgroundColor: item.color || "#f0f8ff" },
+    { width: cardWidth, backgroundColor: bgColor },
     containerStyle,
   ];
-  const goalTextColor = item.count >= item.target ? "#4CAF50" : "#AAA";
+  // Text color adapts to the resolved card background so it's never hidden
+  const textColor = getContrastText(bgColor);
+  const goalTextColor = item.count >= item.target ? "#4CAF50" : textColor;
   const btnColor = { backgroundColor: "rgba(255, 255, 255, 0.4)" };
 
   return (
@@ -118,7 +136,11 @@ const CounterCard = ({
 
       {/* ── Title: tap the settings icon to edit ── */}
       <View style={styles.headerRow}>
-        <Text style={styles.title} numberOfLines={1} allowFontScaling={false}>
+        <Text
+          style={[styles.title, { color: textColor }]}
+          numberOfLines={1}
+          allowFontScaling={false}
+        >
           {item.name}
         </Text>
 
@@ -127,13 +149,17 @@ const CounterCard = ({
           onPress={() => onEdit(item)}
           hitSlop={HIT_SLOP_SMALL}
         >
-          <Ionicons name="settings-outline" size={14} color="#999" />
+          <Ionicons name="settings-outline" size={14} color={textColor} />
         </TouchableOpacity>
       </View>
 
       {/* ── Center (Count) ── */}
       <View style={styles.centerSection}>
-        <Text style={styles.countText} adjustsFontSizeToFit numberOfLines={1}>
+        <Text
+          style={[styles.countText, { color: textColor }]}
+          adjustsFontSizeToFit
+          numberOfLines={1}
+        >
           {item.count}
         </Text>
 

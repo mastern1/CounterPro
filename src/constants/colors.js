@@ -17,55 +17,28 @@ export const COLORS = {
   textSecondary: "#9E9E9E", // Muted / secondary text
   text: "#EAEAEA", // Backwards-compatible alias for textPrimary
 
-  // Pastel palette for counter cards (data-driven, light by design so
-  // black text stays readable — these are NOT app chrome colors).
+  // Counter card text — actual color is chosen per-card by getContrastText()
+  // in CounterCard (auto black/white), so it stays readable on any palette color.
+  cardText: "#FFFFFF",
+
+  // Vibrant Material palette for counter cards — saturated 500–700 range.
   palette: [
     // Reds & Pinks
-    "#FFCDD2",
-    "#F8BBD0",
-    "#FCE4EC",
-    "#F48FB1",
+    "#E53935", "#D81B60", "#C2185B", "#AD1457",
 
     // Purples
-    "#E1BEE7",
-    "#D1C4E9",
-    "#F3E5F5",
-    "#EDE7F6",
+    "#8E24AA", "#7B1FA2", "#5E35B1", "#673AB7",
 
     // Blues & Cyans
-    "#C5CAE9",
-    "#BBDEFB",
-    "#B3E5FC",
-    "#B2EBF2",
-    "#E8EAF6",
-    "#E3F2FD",
-    "#E1F5FE",
-    "#E0F7FA",
+    "#3949AB", "#1E88E5", "#039BE5", "#00ACC1",
 
-    // Greens
-    "#B2DFDB",
-    "#C8E6C9",
-    "#DCEDC8",
-    "#E0F2F1",
-    "#E8F5E9",
-    "#F1F8E9",
-    "#A5D6A7",
-    "#81C784",
+    // Greens & Teals
+    "#00897B", "#00796B", "#43A047", "#388E3C",
 
-    // Yellows & Oranges
-    "#F0F4C3",
-    "#FFF9C4",
-    "#FFECB3",
-    "#FFE0B2",
-    "#F9FBE7",
-    "#FFFDE7",
-    "#FFF8E1",
-    "#FFF3E0",
+    // Ambers & Oranges (darker shades — needed for white-text contrast)
+    "#EF6C00", "#E65100", "#F9A825", "#FF8F00",
 
     // Neutrals
-    "#D7CCC8",
-    "#CFD8DC",
-    "#EFEBE9",
-    "#ECEFF1",
+    "#546E7A", "#455A64", "#6D4C41", "#5D4037",
   ],
 };
