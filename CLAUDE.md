@@ -35,6 +35,13 @@ by running the app.
 - Code comments across `src/` and `App.js` are in **English** (translated from the
   original Arabic). Keep new comments in English.
 - The UI is **dark-only** — there is no light mode or theme toggle.
+- Dependencies are kept lean on purpose: `expo-constants`, `expo-font`,
+  `react-native-reanimated`, and `react-native-worklets` were removed after an audit found
+  zero usage (no imports, no peer-dependency requirement from `react-native-screens` or
+  `@react-navigation/native-stack`, no custom fonts). Don't re-add a package without
+  confirming it's actually imported somewhere — unused native modules measurably slow down
+  navigation. Never run `npm audit fix` / `--force` in this repo — versions are deliberately
+  pinned to what the current Expo SDK supports.
 
 ## Architecture
 
