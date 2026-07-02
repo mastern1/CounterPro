@@ -27,7 +27,7 @@ by running the app.
 
 ## Tech notes
 
-- Expo SDK 56, React 19, React Native 0.85, new architecture with `reactCompiler: true`
+- Expo SDK 57, React 19, React Native 0.86, new architecture with `reactCompiler: true`
   (see `app.json`). Because the React Compiler enforces the Rules of React, keep render
   pure: no side effects, ref writes, or impure calls (`Date.now()`, `Math.random()`)
   during render — `npm run lint` reports these as **errors**, not warnings.
