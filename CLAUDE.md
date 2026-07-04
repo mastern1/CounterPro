@@ -42,6 +42,12 @@ by running the app.
   confirming it's actually imported somewhere — unused native modules measurably slow down
   navigation. Never run `npm audit fix` / `--force` in this repo — versions are deliberately
   pinned to what the current Expo SDK supports.
+- There is **no `babel.config.js`** in this project (removed — it only contained the
+  default `babel-preset-expo` preset with no customization). Expo SDK 54+ applies
+  `babel-preset-expo` automatically, including the React Compiler transform driven by
+  `experiments.reactCompiler` in `app.json` — confirmed via official Expo docs and a live
+  `expo export` bundle check. Only add the file back if a Babel customization is actually
+  needed (run `npx expo customize babel.config.js` at that point).
 
 ## Architecture
 
