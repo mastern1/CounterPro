@@ -1,6 +1,6 @@
 # 🏭 CounterPro | Production Tracking System
 
-![Status](https://img.shields.io/badge/Status-Active_Development-orange) ![Platform](https://img.shields.io/badge/Platform-iOS_%7C_Android-blue) ![Expo](https://img.shields.io/badge/Built_with-Expo_SDK_56-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-Active_Development-orange) ![Platform](https://img.shields.io/badge/Platform-iOS_%7C_Android-blue) ![Expo](https://img.shields.io/badge/Built_with-Expo_SDK_57-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![License](https://img.shields.io/badge/License-MIT-green)
 
 **CounterPro** is a specialized, high-performance mobile app built for factories to track worker productivity in real time. It replaces manual paper counting with a fast, error-resistant, dark-themed interface designed for the factory floor.
 
@@ -39,7 +39,7 @@
 
 | Category             | Technology                                              |
 | -------------------- | ------------------------------------------------------- |
-| **Framework**        | React Native 0.85 · Expo SDK 56 (New Architecture)      |
+| **Framework**        | React Native 0.86 · Expo SDK 57 (New Architecture)      |
 | **Runtime**          | React 19 · React Compiler enabled                       |
 | **Navigation**       | React Navigation 7 (Native Stack)                       |
 | **State Management** | React Context API & Hooks                               |

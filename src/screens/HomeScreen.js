@@ -59,6 +59,15 @@ const HomeScreen = ({ navigation }) => {
     [deleteGroup],
   ); // Depends on the stable Context function
 
+  const handleOpenEditModal = useCallback((group) => {
+    setEditingGroupId(group.id);
+    setModalVisible(true);
+  }, []);
+
+  const handleExportPress = useCallback(() => {
+    Alert.alert(TEXTS.alertError, TEXTS.editFeature);
+  }, []);
+
   const handleUpdatedGroup = useCallback(
     (data) => {
       const { name } = data;
@@ -98,16 +107,13 @@ const HomeScreen = ({ navigation }) => {
     ({ item }) => (
       <GroupCard
         item={item}
-        onPress={() => handlePressGroup(item)}
-        onEdit={() => {
-          setEditingGroupId(item.id);
-          setModalVisible(true);
-        }}
-        onExport={() => Alert.alert(TEXTS.alertError, TEXTS.editFeature)}
-        onDelete={() => handleDeleteGroup(item.id)}
+        onPress={handlePressGroup}
+        onEdit={handleOpenEditModal}
+        onExport={handleExportPress}
+        onDelete={handleDeleteGroup}
       />
     ),
-    [handlePressGroup, handleDeleteGroup],
+    [handlePressGroup, handleOpenEditModal, handleExportPress, handleDeleteGroup],
   );
 
   return (

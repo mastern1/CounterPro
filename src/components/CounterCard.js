@@ -1,7 +1,6 @@
 import React, { memo } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { TEXTS as appStrings } from "../constants/translations";
 
 // ── 1. Memory constants ─────────────────────────────────────────────
@@ -30,9 +29,7 @@ const CounterCard = ({
   index,
   onIncrement,
   onDecrement,
-  onReset,
   onEdit,
-  onDelete,
   onMoveUp,
   onMoveDown,
   isFirst,
@@ -41,53 +38,6 @@ const CounterCard = ({
   cardWidth,
   containerStyle,
 }) => {
-  // ── Logic ─────────────────────────────────────────────────────────
-  const handleIncrement = () => {
-    const targetValue = parseInt(item.target || 0);
-
-    // 1. Target check
-    if (targetValue > 0 && item.count >= targetValue) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
-        appStrings.alertError || "Alert",
-        "You have reached your goal!",
-        [{ text: appStrings.okBtn || "OK", style: "default" }],
-      );
-      return;
-    }
-
-    // 2. Haptic feedback
-    const stepValue = item.step || 1;
-    const nextValue = item.count + stepValue;
-
-    if (targetValue > 0 && nextValue >= targetValue) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-
-    // 3. Execute
-    onIncrement(item.id);
-  };
-
-  const handleDeleteConfirm = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      appStrings.deleteTitle || "Delete",
-      appStrings.deleteMessage
-        ? appStrings.deleteMessage(item.name)
-        : "Delete item?",
-      [
-        { text: appStrings.cancelBtn || "Cancel", style: "cancel" },
-        {
-          text: appStrings.deleteBtn || "Delete",
-          style: "destructive",
-          onPress: () => onDelete(item.id),
-        },
-      ],
-    );
-  };
-
   const buttonText = `+${item.step || 1}`;
 
   // Prepare dynamic colors/styles once
@@ -182,7 +132,7 @@ const CounterCard = ({
       {/* ── Increment Button ── */}
       <TouchableOpacity
         style={[styles.incrementButton, btnColor]}
-        onPress={handleIncrement}
+        onPress={() => onIncrement(item.id)}
         activeOpacity={ACTIVE_OPACITY}
       >
         <Text

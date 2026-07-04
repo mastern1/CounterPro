@@ -6,7 +6,7 @@ const GroupCard = ({ item, onPress, onEdit, onExport, onDelete }) => {
   return (
     <TouchableOpacity
       style={styles.cardContainer}
-      onPress={onPress}
+      onPress={() => onPress(item)}
       activeOpacity={0.7}
     >
       <View
@@ -30,7 +30,7 @@ const GroupCard = ({ item, onPress, onEdit, onExport, onDelete }) => {
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
-            onPress={onEdit}
+            onPress={() => onEdit(item)}
           >
             <Text style={styles.actionIcon}>✎</Text>
           </TouchableOpacity>
@@ -41,7 +41,7 @@ const GroupCard = ({ item, onPress, onEdit, onExport, onDelete }) => {
 
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={onDelete}
+            onPress={() => onDelete(item.id)}
           >
             <Text style={[styles.actionIcon, { color: "#EF5350" }]}>🗑️</Text>
           </TouchableOpacity>

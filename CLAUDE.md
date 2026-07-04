@@ -54,6 +54,26 @@ by running the app.
 Entry: `index.js` → `App.js` wraps the tree in `GestureHandlerRootView` →
 `SafeAreaProvider` → `ProjectProvider` → `NavigationContainer` → `AppNavigator`.
 
+### Memoization pattern (`CounterCard` / `GroupCard`)
+Both are wrapped in `React.memo`, so they only re-render when their own props actually
+change. That guarantee depends on two things holding at every call site:
+1. The handlers passed in as props must be genuinely stable across renders — wrapping a
+   function in `useCallback` is not enough if its dependency array includes something that
+   changes on every relevant update (e.g. the `items`/`groups` array itself, which gets a
+   new reference on every edit via `.map()`/`.filter()`). `DashboardScreen.js` keeps
+   `handleIncrement/Decrement/Reset/Delete/Move` stable by reading the latest items from an
+   `itemsRef` (kept in sync via a `useEffect`, same pattern as `useSessionManager`'s
+   `latestItemsRef`) instead of closing over `items` directly.
+2. Per-item binding (turning a stable `(item) => ...` handler into the specific button's
+   `onPress`) must happen **inside** the memoized child, not in the parent's `renderItem`.
+   `CounterCard` does `onPress={() => onIncrement(item.id)}` itself; `GroupCard` does
+   `onPress={() => onPress(item)}` itself. If the parent's `renderItem` pre-binds the item
+   (`onPress={() => handler(item)}`) it creates a brand-new function on every call,
+   defeating the child's `memo` regardless of how stable the underlying handler is.
+
+When adding a new prop to either card, wire it the same way — pass the raw stable handler
+down and let the card bind the item itself.
+
 ### State — single source of truth
 `src/context/ProjectContext.js` holds **all** app state (`groups`, `userData`,
 `isGridLayout`, `isLoading`) and every mutator. There is no Redux/Zustand; screens read
@@ -105,11 +125,16 @@ Counting only happens inside a session. Two pieces cooperate:
   sync. Keep `buildSessionRecord` pure — it's reusable for crash recovery later.
 
 Dashboard enforces the session gate: `handleIncrement/Decrement/Reset/Delete` all check
-`timerRef.current?.isSessionActive()` and alert if no session is running. A `beforeRemove`
-navigation guard blocks leaving while a timer runs. `handleIncrement` clamps the new count
-at `item.target` (when a target is set) so a `step` that doesn't evenly divide into the
-distance to the goal can't jump the count past it — the "goal reached" alert in
-`CounterCard` depends on the count never exceeding `target`.
+`timerRef.current?.isSessionActive()` **first**, before any other logic, and alert if no
+session is running. A `beforeRemove` navigation guard blocks leaving while a timer runs.
+All per-item business logic — the goal-reached check/alert, the haptic feedback, and the
+clamp at `item.target` (so a `step` that doesn't evenly divide into the distance to the
+goal can't jump the count past it) — lives in `handleIncrement` in `DashboardScreen.js`,
+*after* the session check. `CounterCard` itself is presentational only for these buttons
+(`onPress={() => onIncrement(item.id)}` / `onDecrement(item.id)`); it does not run its own
+pre-checks. Keep it this way — a goal/business-logic check placed in the child would run
+before the parent's session gate ever executes, misfiring the wrong alert (e.g. "goal
+reached" instead of "session inactive") when both conditions are true at once.
 
 ### Layout / responsiveness
 Dashboard computes `numColumns` and card width dynamically from

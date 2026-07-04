@@ -57,6 +57,7 @@ export default function DashboardScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const timerRef = useRef(null); // Remote control for the timer
+  const itemsRef = useRef([]); // Latest items, read by handlers without making them unstable
 
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,6 +76,9 @@ export default function DashboardScreen({ route, navigation }) {
 
   // 2. Items (useMemo keeps the array reference stable in memory)
   const items = useMemo(() => currentGroup?.items ?? [], [currentGroup]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const { startSession, endSession } = useSessionManager(
     items,
     { id: groupId, name: groupName },
@@ -123,19 +127,40 @@ export default function DashboardScreen({ route, navigation }) {
         );
         return;
       }
-      const updatedList = items.map((item) => {
-        if (item.id !== itemId) return item;
-        const step = item.step || 1;
+
+      const currentItems = itemsRef.current;
+      const item = currentItems.find((i) => i.id === itemId);
+      const targetValue = parseInt(item?.target || 0);
+
+      // Goal check runs after the session gate, same as every other action.
+      if (targetValue > 0 && item.count >= targetValue) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          TEXTS.alertError || "Alert",
+          "You have reached your goal!",
+          [{ text: TEXTS.okBtn || "OK", style: "default" }],
+        );
+        return;
+      }
+
+      const step = item.step || 1;
+      const nextValue = item.count + step;
+      if (targetValue > 0 && nextValue >= targetValue) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+
+      const updatedList = currentItems.map((i) => {
+        if (i.id !== itemId) return i;
         // Clamp at the target so a step overshoot can't jump past the goal.
         const newCount =
-          item.target > 0
-            ? Math.min(item.count + step, item.target)
-            : item.count + step;
-        return { ...item, count: newCount };
+          targetValue > 0 ? Math.min(i.count + step, targetValue) : i.count + step;
+        return { ...i, count: newCount };
       });
       saveChanges(updatedList);
     },
-    [items, saveChanges],
+    [saveChanges],
   );
 
   // Decrement (separated and stable)
@@ -150,14 +175,15 @@ export default function DashboardScreen({ route, navigation }) {
         );
         return;
       }
-      const updatedList = items.map((item) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const updatedList = itemsRef.current.map((item) => {
         if (item.id !== itemId) return item;
         const step = item.step || 1;
         return { ...item, count: Math.max(0, item.count - step) };
       });
       saveChanges(updatedList);
     },
-    [items, saveChanges],
+    [saveChanges],
   );
 
   // Reset
@@ -172,7 +198,7 @@ export default function DashboardScreen({ route, navigation }) {
         );
         return;
       }
-      const item = items.find((i) => i.id === itemId);
+      const item = itemsRef.current.find((i) => i.id === itemId);
       Alert.alert(
         TEXTS.resetAlertTitle,
         TEXTS.resetMessage
@@ -183,7 +209,7 @@ export default function DashboardScreen({ route, navigation }) {
           {
             text: TEXTS.confirmBtn,
             onPress: () => {
-              const resetList = items.map((i) =>
+              const resetList = itemsRef.current.map((i) =>
                 i.id === itemId ? { ...i, count: 0 } : i,
               );
               saveChanges(resetList);
@@ -192,7 +218,7 @@ export default function DashboardScreen({ route, navigation }) {
         ],
       );
     },
-    [items, saveChanges],
+    [saveChanges],
   );
 
   const handleDelete = useCallback(
@@ -210,7 +236,7 @@ export default function DashboardScreen({ route, navigation }) {
       Alert.alert(
         TEXTS.deleteTitle || "Delete",
         TEXTS.deleteMessage
-          ? TEXTS.deleteMessage(items.find((i) => i.id === itemId)?.name)
+          ? TEXTS.deleteMessage(itemsRef.current.find((i) => i.id === itemId)?.name)
           : "Delete item?",
         [
           { text: TEXTS.cancelBtn || "Cancel", style: "cancel" },
@@ -218,19 +244,19 @@ export default function DashboardScreen({ route, navigation }) {
             text: TEXTS.deleteBtn || "Delete",
             style: "destructive",
             onPress: () => {
-              const filteredList = items.filter((i) => i.id !== itemId);
+              const filteredList = itemsRef.current.filter((i) => i.id !== itemId);
               saveChanges(filteredList);
             },
           },
         ],
       );
     },
-    [items, saveChanges],
+    [saveChanges],
   );
 
   const handleMove = useCallback(
     (index, direction) => {
-      const newItems = [...items];
+      const newItems = [...itemsRef.current];
       const targetIndex = direction === "up" ? index - 1 : index + 1;
       if (targetIndex < 0 || targetIndex >= newItems.length) return;
       [newItems[index], newItems[targetIndex]] = [
@@ -239,7 +265,7 @@ export default function DashboardScreen({ route, navigation }) {
       ];
       saveChanges(newItems);
     },
-    [items, saveChanges],
+    [saveChanges],
   );
 
   // ── Modal (add / edit) ──
@@ -329,8 +355,6 @@ export default function DashboardScreen({ route, navigation }) {
         // Pass the separated handlers (correct wiring)
         onIncrement={handleIncrement}
         onDecrement={handleDecrement}
-        onReset={handleReset}
-        onDelete={handleDelete}
         onEdit={openEditModal}
         onMoveUp={handleMove}
         onMoveDown={handleMove}
@@ -343,8 +367,6 @@ export default function DashboardScreen({ route, navigation }) {
       dynamicCardWidth,
       handleIncrement, // Stable function
       handleDecrement, // Stable function
-      handleReset,
-      handleDelete,
       openEditModal,
       handleMove,
       items.length,
