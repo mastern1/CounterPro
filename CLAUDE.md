@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CounterPro** is an offline-first Expo / React Native app for tracking factory worker
 productivity. Workers organize production lines into *groups*, each containing *counter
-items* they tap to increment during timed work *sessions*. All data is local-only
-(AsyncStorage); cloud sync (Supabase) and a web admin dashboard are on the roadmap but
-not yet implemented.
+items* they tap to increment during timed work *sessions*. AsyncStorage is the local
+source of truth; on top of it, completed data is mirrored to **Supabase** (implemented —
+see "Cloud sync" below). A **web admin dashboard** that reads the Supabase data (live
+device/session monitoring, monthly production summaries, Excel export) is the next
+roadmap item — not yet built.
 
 ## Commands
 
@@ -48,6 +50,12 @@ by running the app.
   `experiments.reactCompiler` in `app.json` — confirmed via official Expo docs and a live
   `expo export` bundle check. Only add the file back if a Babel customization is actually
   needed (run `npx expo customize babel.config.js` at that point).
+- Supabase keys live in a gitignored **`.env`** (`EXPO_PUBLIC_SUPABASE_URL`,
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY`). Expo's CLI loads `.env` and inlines `EXPO_PUBLIC_*`
+  vars automatically (no `dotenv` package). Because they're inlined at **bundle time**, a
+  `.env` change needs a Metro restart (`npx expo start -c`) to take effect. The anon key
+  is the newer `sb_publishable_...` format — safe to embed because RLS + the write-only
+  function layer (see Cloud sync) mean it can't read data.
 
 ## Architecture
 
@@ -93,9 +101,52 @@ silently marked as saved. When changing the data shape, update both the save pat
 `loadAll`.
 
 `StorageService` also persists completed sessions under a separate `SESSION_LOGS` key via
-`appendSessionLog` / `loadSessionLogs` (see Sessions below). These intentionally **survive
-logout** — `clearAll` only removes `DATA`/`USER`/`LAYOUT` — so unsynced records aren't lost
-before the planned Supabase upload.
+`appendSessionLog` / `loadSessionLogs` (see Sessions below). Each log carries a
+`synced` boolean (`markSessionSynced` flips it once Supabase confirms the upload). These
+intentionally **survive logout** — `clearAll` only removes `DATA`/`USER`/`LAYOUT` — so
+unsynced records aren't lost; `SyncService.retryUnsyncedSessions` backfills them on next
+launch. `getSyncDeviceId()` returns a stable per-install id under `SYNC_DEVICE_ID` (also
+kept across logout): the Supabase device identity. **Don't** use `userData.deviceId` for
+Supabase — that's only the device *model name* (for display) and collides across two
+phones of the same model.
+
+### Cloud sync (Supabase)
+`src/services/supabaseClient.js` creates the client (no session persistence — the app has
+no Supabase Auth). `src/services/syncService.js` is the **only** module that talks to
+Supabase. The backend schema + write layer are documented in `supabase_schema.sql` and
+`supabase_functions.sql` at the repo root (the SQL you run in the Supabase SQL Editor).
+
+Four tables: `devices`, `groups`, `counters` (live mirror, composite PK `device_id,id`
+because local `Date.now()` ids are only unique per-device), and `sessions` (uuid PK,
+`active`→`completed` lifecycle — a device is "live" on the dashboard by having a session
+row with `status='active'`, no separate presence table). Monthly summaries are plain
+aggregate SQL over `sessions`; no rollup table.
+
+**Security model — writes go through `SECURITY DEFINER` functions, never direct table
+writes.** `syncService` calls `supabase.rpc('register_device' | 'sync_groups_and_counters'
+| 'start_session' | 'complete_session' | 'upload_completed_session', ...)`. Those Postgres
+functions run as the table owner (bypass RLS internally); the anon/publishable key has
+only `EXECUTE` on them and **zero direct table access**. RLS keeps reads
+`authenticated`-only (the dashboard), so the key embedded in the APK can write but can
+never read production data.
+
+**Why functions instead of `.from().upsert()` (do not "simplify" this back):** a direct
+client `.upsert()` fails RLS with `42501 "new row violates row-level security policy"` even
+when the anon INSERT policy is `with_check(true)`. Root cause (proven via curl): plain
+INSERT and plain UPDATE both work for anon, but **any `ON CONFLICT` (upsert) requires a
+SELECT policy** on the table, which anon deliberately lacks. `return=minimal` does not
+help. Routing writes through `SECURITY DEFINER` functions is the fix that keeps the tables
+unreadable by the public key while upsert-style syncing still works. If you add a new
+synced entity, add a function + `rpc()` call — don't reach for `.from().upsert()`.
+
+Every `SyncService` call is **fire-and-forget**: wrapped in try/catch, errors logged not
+thrown, never `await`-ed at the call site — a slow/failed network must never block the
+offline-first UI. Note Supabase-js does **not** throw on DB/RLS errors; it returns
+`{ error }`, so every call checks `if (error) throw error`. Triggers: device registration
++ `retryUnsyncedSessions` on launch (registration is `await`-ed first — sessions FK the
+device row); `syncGroupsAndCounters` piggybacks the 500ms Smart Save (so ~2 writes/sec max
+even under tap-spam, not one per tap); the session lifecycle from `useSessionManager`.
+Timestamps are stored UTC (`timestamptz`); the dashboard localizes to Istanbul for display.
 
 ### Navigation flow
 `src/navigation/AppNavigator.js` — native stack, headers hidden (each screen draws its
@@ -119,10 +170,13 @@ Counting only happens inside a session. Two pieces cooperate:
   `endSession` builds a `sessionRecord` via the pure `buildSessionRecord()` helper in
   `src/utils/sessionUtils.js` (diffs current vs. snapshot: added/active/deleted items,
   worker, group, duration, `status`). On a clean end the record is **persisted locally**
-  through `StorageService.appendSessionLog` (the `SESSION_LOGS` store) and also returned
-  (though `SessionTimer` currently ignores the return value). This record is the payload
-  shape intended for future Supabase upload; `loadSessionLogs()` is the read side for that
-  sync. Keep `buildSessionRecord` pure — it's reusable for crash recovery later.
+  through `StorageService.appendSessionLog` (the `SESSION_LOGS` store, tagged
+  `synced:false`) and also returned (though `SessionTimer` currently ignores the return
+  value). `useSessionManager` also drives the remote session lifecycle: `startSession`
+  calls `SyncService.startRemoteSession` (inserts an `active` row, remembers its id in a
+  ref), and `endSession` calls `SyncService.completeRemoteSession` (flips that row to
+  `completed`), marking the local log `synced` only once Supabase confirms. Keep
+  `buildSessionRecord` pure — it's reusable for crash recovery later.
 
 Dashboard enforces the session gate: `handleIncrement/Decrement/Reset/Delete` all check
 `timerRef.current?.isSessionActive()` **first**, before any other logic, and alert if no
