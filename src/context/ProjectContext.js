@@ -8,6 +8,7 @@ import {
 } from "react";
 import { AppState } from "react-native";
 import { StorageService } from "../services/storageService";
+import { SyncService } from "../services/syncService";
 import { generateId, getRandomColor } from "../utils/generators";
 
 export const ProjectContext = createContext();
@@ -18,6 +19,7 @@ export const ProjectProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [isGridLayout, setIsGridLayout] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncDeviceId, setSyncDeviceId] = useState(null);
 
   // ─── 2. Refs ───
   const saveTimeoutRef = useRef(null);
@@ -28,11 +30,15 @@ export const ProjectProvider = ({ children }) => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        const data = await StorageService.loadAll();
+        const [data, deviceId] = await Promise.all([
+          StorageService.loadAll(),
+          StorageService.getSyncDeviceId(),
+        ]);
         setGroups(data.groups);
         previousGroupsRef.current = JSON.stringify(data.groups);
         setUserData(data.user);
         setIsGridLayout(data.layout);
+        setSyncDeviceId(deviceId);
       } catch (e) {
         console.error("Initialization Failed", e);
       } finally {
@@ -42,7 +48,21 @@ export const ProjectProvider = ({ children }) => {
     initApp();
   }, []);
 
-  // ─── 4. Smart Save logic ───
+  // ─── 4. Register/refresh this device on Supabase whenever identity is known,
+  // and retry uploading any session logs that never made it up (e.g. a
+  // session that ran entirely while offline) ───
+  useEffect(() => {
+    if (isLoading || !syncDeviceId || !userData) return;
+    const syncOnLaunch = async () => {
+      // Retry must wait for registration: sessions.device_id has a foreign
+      // key on devices, so uploading before the device row exists fails.
+      await SyncService.registerDevice(syncDeviceId, userData.name);
+      SyncService.retryUnsyncedSessions(syncDeviceId);
+    };
+    syncOnLaunch();
+  }, [isLoading, syncDeviceId, userData]);
+
+  // ─── 5. Smart Save logic ───
   useEffect(() => {
     if (isLoading) return;
     const groupsString = JSON.stringify(groups);
@@ -53,6 +73,7 @@ export const ProjectProvider = ({ children }) => {
         await StorageService.saveGroups(groups);
         previousGroupsRef.current = groupsString; // only mark "saved" once it actually is
         console.log("✅ Smart Save Executed");
+        SyncService.syncGroupsAndCounters(syncDeviceId, groups);
       } catch (e) {
         console.error("❌ Save failed", e);
       }
@@ -76,7 +97,7 @@ export const ProjectProvider = ({ children }) => {
       subscription.remove();
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [groups, isLoading]);
+  }, [groups, isLoading, syncDeviceId]);
 
   // ─── 5. Persist layout ───
   useEffect(() => {
@@ -154,6 +175,7 @@ export const ProjectProvider = ({ children }) => {
       userData,
       isGridLayout,
       isLoading,
+      syncDeviceId,
       loginUser,
       logoutUser,
       toggleLayout,
@@ -167,6 +189,7 @@ export const ProjectProvider = ({ children }) => {
       userData,
       isGridLayout,
       isLoading,
+      syncDeviceId,
       loginUser,
       logoutUser,
       toggleLayout,

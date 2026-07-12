@@ -6,7 +6,8 @@ const KEYS = {
   DATA: '@counters_pro_data_v1',
   USER: '@counters_pro_session_v1',
   LAYOUT: '@counters_pro_layout_v1',
-  SESSION_LOGS: '@counters_pro_session_logs_v1' // Completed session records (source for future Supabase sync)
+  SESSION_LOGS: '@counters_pro_session_logs_v1', // Completed session records (source for future Supabase sync)
+  SYNC_DEVICE_ID: '@counters_pro_sync_device_id_v1' // Unique per-install id for Supabase (userData.deviceId is just the device model name, not unique)
 };
 
 export const StorageService = {
@@ -72,6 +73,22 @@ export const StorageService = {
     }
   },
 
+  // Mark one stored session log as successfully synced to Supabase
+  markSessionSynced: async (sessionId) => {
+    try {
+      const existing = await AsyncStorage.getItem(KEYS.SESSION_LOGS);
+      const logs = existing ? JSON.parse(existing) : [];
+      const updated = logs.map((log) =>
+        log.sessionId === sessionId ? { ...log, synced: true } : log,
+      );
+      await AsyncStorage.setItem(KEYS.SESSION_LOGS, JSON.stringify(updated));
+      return true;
+    } catch (error) {
+      console.error('Storage Mark Session Synced Error:', error);
+      return false;
+    }
+  },
+
   // Load all stored session records
   loadSessionLogs: async () => {
     try {
@@ -83,8 +100,25 @@ export const StorageService = {
     }
   },
 
-  // Clear everything (logout). SESSION_LOGS is intentionally kept so unsynced
-  // session records survive logout (synced to Supabase later).
+  // Get (or create, once ever) this install's unique Supabase device id.
+  // Survives logout so a phone keeps the same identity across workers/shifts.
+  getSyncDeviceId: async () => {
+    try {
+      let id = await AsyncStorage.getItem(KEYS.SYNC_DEVICE_ID);
+      if (!id) {
+        id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        await AsyncStorage.setItem(KEYS.SYNC_DEVICE_ID, id);
+      }
+      return id;
+    } catch (error) {
+      console.error('Storage Get Sync Device Id Error:', error);
+      return null;
+    }
+  },
+
+  // Clear everything (logout). SESSION_LOGS and SYNC_DEVICE_ID are
+  // intentionally kept so unsynced session records survive logout (synced to
+  // Supabase later) and the device keeps a stable identity across workers.
   clearAll: async () => {
     try {
       await AsyncStorage.multiRemove([KEYS.DATA, KEYS.USER, KEYS.LAYOUT]);

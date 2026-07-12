@@ -62,7 +62,7 @@ export default function DashboardScreen({ route, navigation }) {
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { groups, updateGroup, isGridLayout, toggleLayout, userData } =
+  const { groups, updateGroup, isGridLayout, toggleLayout, userData, syncDeviceId } =
     useContext(ProjectContext);
   const { groupId, groupName } = route?.params || {};
 
@@ -82,7 +82,7 @@ export default function DashboardScreen({ route, navigation }) {
   const { startSession, endSession } = useSessionManager(
     items,
     { id: groupId, name: groupName },
-    { name: userData?.name },
+    { name: userData?.name, syncDeviceId },
   );
 
   // 3. Grid calculations (heavy enough to deserve useMemo)
