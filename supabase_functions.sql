@@ -167,6 +167,18 @@ end;
 $$;
 
 -- Upload an already-finished session in one shot (retry / offline backfill).
+-- Idempotent: the client sends its local session id and a unique index on
+-- (device_id, client_session_id) makes a re-upload of the same record a
+-- no-op instead of a duplicate row. Rows from start_session keep a NULL
+-- client_session_id (multiple NULLs never conflict).
+alter table sessions add column if not exists client_session_id text;
+create unique index if not exists uidx_sessions_device_client_session
+  on sessions (device_id, client_session_id);
+
+-- The old 7-arg signature must be dropped explicitly: CREATE OR REPLACE with
+-- a different parameter list would create an overload, not replace it.
+drop function if exists public.upload_completed_session(text, text, text, jsonb, int, timestamptz, timestamptz);
+
 create or replace function public.upload_completed_session(
   p_device_id text,
   p_group_id text,
@@ -174,7 +186,8 @@ create or replace function public.upload_completed_session(
   p_items jsonb,
   p_duration_seconds int,
   p_started_at timestamptz,
-  p_ended_at timestamptz
+  p_ended_at timestamptz,
+  p_client_session_id text default null
 ) returns void
 language plpgsql
 security definer
@@ -182,10 +195,12 @@ set search_path = public
 as $$
 begin
   insert into sessions (device_id, group_id, worker_name, status, items,
-                        duration_seconds, started_at, ended_at, last_update_at)
+                        duration_seconds, started_at, ended_at, last_update_at,
+                        client_session_id)
   values (p_device_id, p_group_id, coalesce(p_worker_name, 'Unknown Worker'),
           'completed', p_items, p_duration_seconds, p_started_at,
-          coalesce(p_ended_at, now()), now());
+          coalesce(p_ended_at, now()), now(), p_client_session_id)
+  on conflict (device_id, client_session_id) do nothing;
 end;
 $$;
 
@@ -194,10 +209,10 @@ revoke all on function public.register_device(text, text) from public;
 revoke all on function public.sync_groups_and_counters(text, jsonb) from public;
 revoke all on function public.start_session(text, text, text, timestamptz) from public;
 revoke all on function public.complete_session(uuid, jsonb, int, timestamptz) from public;
-revoke all on function public.upload_completed_session(text, text, text, jsonb, int, timestamptz, timestamptz) from public;
+revoke all on function public.upload_completed_session(text, text, text, jsonb, int, timestamptz, timestamptz, text) from public;
 
 grant execute on function public.register_device(text, text) to anon, authenticated;
 grant execute on function public.sync_groups_and_counters(text, jsonb) to anon, authenticated;
 grant execute on function public.start_session(text, text, text, timestamptz) to anon, authenticated;
 grant execute on function public.complete_session(uuid, jsonb, int, timestamptz) to anon, authenticated;
-grant execute on function public.upload_completed_session(text, text, text, jsonb, int, timestamptz, timestamptz) to anon, authenticated;
+grant execute on function public.upload_completed_session(text, text, text, jsonb, int, timestamptz, timestamptz, text) to anon, authenticated;

@@ -69,6 +69,10 @@ export const ProjectProvider = ({ children }) => {
     if (groupsString === previousGroupsRef.current) return;
 
     const saveNow = async () => {
+      // The AppState listener outlives a successful debounced save (nothing
+      // re-runs this effect), so a later background flush would re-save and
+      // re-sync identical data without this check.
+      if (groupsString === previousGroupsRef.current) return;
       try {
         await StorageService.saveGroups(groups);
         previousGroupsRef.current = groupsString; // only mark "saved" once it actually is

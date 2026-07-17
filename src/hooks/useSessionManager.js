@@ -81,26 +81,37 @@ export const useSessionManager = (items, groupData, userData) => {
         status: "completed",
       });
 
-      // Persist the completed session locally (source for future Supabase sync).
-      // Tagged unsynced until Supabase confirms the write, so a launch-time
-      // retry can pick it up if this attempt fails (e.g. offline).
-      StorageService.appendSessionLog({ ...sessionRecord, synced: false }).catch(
-        (e) => console.error("Failed to save session log", e),
-      );
-
-      SyncService.completeRemoteSession({
-        remoteSessionId: remoteSessionIdRef.current,
-        items: {
-          production: sessionRecord.production,
-          deletedDuringSession: sessionRecord.deletedDuringSession,
-        },
-        durationSeconds: durationInSeconds,
-        endedAt: sessionRecord.endTime,
-      }).then((success) => {
-        if (success) {
-          StorageService.markSessionSynced(sessionRecord.sessionId);
-        }
-      });
+      // Persist the completed session locally, then flip the remote row to
+      // completed, then mark the local log synced. Chained on purpose:
+      // appendSessionLog and markSessionSynced both read-modify-write the
+      // same SESSION_LOGS key, so they must never run in parallel. The
+      // remote id is captured now because the refs are reset synchronously
+      // below, before the chain runs.
+      const remoteSessionId = remoteSessionIdRef.current;
+      StorageService.appendSessionLog({ ...sessionRecord, synced: false })
+        .then(() =>
+          SyncService.completeRemoteSession({
+            remoteSessionId,
+            items: {
+              production: sessionRecord.production,
+              deletedDuringSession: sessionRecord.deletedDuringSession,
+            },
+            durationSeconds: durationInSeconds,
+            endedAt: sessionRecord.endTime,
+          }),
+        )
+        .then(async (success) => {
+          if (!success) return;
+          const marked = await StorageService.markSessionSynced(
+            sessionRecord.sessionId,
+          );
+          if (!marked) {
+            // Not fatal: the launch-time re-upload is idempotent
+            // (upload_completed_session dedupes on client_session_id).
+            console.warn("⚠️ Session uploaded but not marked synced locally");
+          }
+        })
+        .catch((e) => console.error("Failed to save session log", e));
 
       console.log(
         "📦 Final Session Record:\n",

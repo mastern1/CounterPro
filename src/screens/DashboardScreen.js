@@ -79,10 +79,21 @@ export default function DashboardScreen({ route, navigation }) {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+  // Memoized so useSessionManager's callbacks (and with them the props of
+  // React.memo(SessionTimer)) stay referentially stable across re-renders —
+  // inline literals here would defeat that memo on every counter tap.
+  const sessionGroup = useMemo(
+    () => ({ id: groupId, name: groupName }),
+    [groupId, groupName],
+  );
+  const sessionUser = useMemo(
+    () => ({ name: userData?.name, syncDeviceId }),
+    [userData?.name, syncDeviceId],
+  );
   const { startSession, endSession } = useSessionManager(
     items,
-    { id: groupId, name: groupName },
-    { name: userData?.name, syncDeviceId },
+    sessionGroup,
+    sessionUser,
   );
 
   // 3. Grid calculations (heavy enough to deserve useMemo)
@@ -301,7 +312,7 @@ export default function DashboardScreen({ route, navigation }) {
       } else {
         updatedList = items.map((item) =>
           item.id === editingItem.id
-            ? { ...item, name, step, target, color }
+            ? { ...item, name, step: validateStep(step), target, color }
             : item,
         );
       }

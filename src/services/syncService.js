@@ -105,6 +105,9 @@ export const SyncService = {
         p_duration_seconds: record.durationSeconds,
         p_started_at: record.startTime,
         p_ended_at: record.endTime,
+        // Local session id — the server dedupes on (device_id, client
+        // session id), so retrying an already-uploaded record is a no-op.
+        p_client_session_id: record.sessionId ?? null,
       });
       if (error) throw error;
       return true;
