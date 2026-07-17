@@ -82,6 +82,11 @@ change. That guarantee depends on two things holding at every call site:
 When adding a new prop to either card, wire it the same way — pass the raw stable handler
 down and let the card bind the item itself.
 
+The same rule applies to hook arguments: `DashboardScreen` passes **memoized** objects
+(`sessionGroup` / `sessionUser`) into `useSessionManager`, because inline object literals
+there would change identity every render → recreate `startSession`/`endSession` (their
+`useCallback` deps) → defeat `React.memo(SessionTimer)` on every counter tap.
+
 ### State — single source of truth
 `src/context/ProjectContext.js` holds **all** app state (`groups`, `userData`,
 `isGridLayout`, `isLoading`) and every mutator. There is no Redux/Zustand; screens read
@@ -97,7 +102,9 @@ JSON snapshot, plus a flush on `AppState` → background/inactive. `previousGrou
 only updated **after** `StorageService.saveGroups()` resolves successfully (not eagerly
 when the change is detected) — this keeps the ref an honest mirror of what's actually on
 disk, so a failed write is naturally retried on the next `groups` change instead of being
-silently marked as saved. When changing the data shape, update both the save path and
+silently marked as saved. `saveNow` also re-checks the ref before writing: the AppState
+listener outlives a successful debounced save (nothing re-runs the effect), so without
+that guard every backgrounding would re-save and re-sync identical data. When changing the data shape, update both the save path and
 `loadAll`.
 
 `StorageService` also persists completed sessions under a separate `SESSION_LOGS` key via
@@ -139,6 +146,21 @@ help. Routing writes through `SECURITY DEFINER` functions is the fix that keeps 
 unreadable by the public key while upsert-style syncing still works. If you add a new
 synced entity, add a function + `rpc()` call — don't reach for `.from().upsert()`.
 
+**Deletions propagate.** `sync_groups_and_counters` upserts the payload *and then deletes*
+this device's `groups`/`counters` rows that are absent from it (null-safe `NOT EXISTS`,
+counters first — group deletion also cascades via FK). An **empty array is a valid
+payload** (it wipes the device's rows — the "last group deleted" / logout case), so
+`syncGroupsAndCounters` only bails on a missing `groups`, never on `length === 0`. Don't
+reintroduce that early return.
+
+**Session upload is idempotent.** `sessions` has a `client_session_id` column with a
+unique index on `(device_id, client_session_id)`; `upload_completed_session` inserts
+`ON CONFLICT DO NOTHING` and `syncService` passes the local `record.sessionId`. So a
+retry of an already-uploaded log is a no-op, never a duplicate row (rows created by
+`start_session` keep a NULL `client_session_id`; NULLs never conflict). After editing
+`supabase_functions.sql`, **re-run it in the Supabase SQL Editor** — the file is written
+to be safe to re-run end-to-end.
+
 Every `SyncService` call is **fire-and-forget**: wrapped in try/catch, errors logged not
 thrown, never `await`-ed at the call site — a slow/failed network must never block the
 offline-first UI. Note Supabase-js does **not** throw on DB/RLS errors; it returns
@@ -172,11 +194,22 @@ Counting only happens inside a session. Two pieces cooperate:
   worker, group, duration, `status`). On a clean end the record is **persisted locally**
   through `StorageService.appendSessionLog` (the `SESSION_LOGS` store, tagged
   `synced:false`) and also returned (though `SessionTimer` currently ignores the return
-  value). `useSessionManager` also drives the remote session lifecycle: `startSession`
-  calls `SyncService.startRemoteSession` (inserts an `active` row, remembers its id in a
-  ref), and `endSession` calls `SyncService.completeRemoteSession` (flips that row to
-  `completed`), marking the local log `synced` only once Supabase confirms. Keep
-  `buildSessionRecord` pure — it's reusable for crash recovery later.
+  value). `useSessionManager` also drives the remote session lifecycle, with two
+  invariants to preserve:
+  - `startSession` calls `SyncService.startRemoteSession`, but the returned uuid is only
+    kept if **the same session is still active when the RPC resolves** — a per-session
+    generation counter guards the `.then`, and a stale response's row is completed
+    immediately with empty production. Without this, a fast stop on a slow network leaves
+    the remote row `status='active'` forever, and worse, the late uuid lands in the ref
+    where the *next* session's `endSession` would complete the wrong row.
+  - `endSession` chains `appendSessionLog` → `completeRemoteSession` →
+    `markSessionSynced` **strictly in sequence** — the first and last both
+    read-modify-write the same `SESSION_LOGS` key, so running them in parallel can drop
+    or mis-flag the record. The remote id is captured into a local before the refs reset.
+    A failed `markSessionSynced` only warns: the launch-time re-upload is idempotent (see
+    Cloud sync), so a duplicate row can't happen.
+
+  Keep `buildSessionRecord` pure — it's reusable for crash recovery later.
 
 Dashboard enforces the session gate: `handleIncrement/Decrement/Reset/Delete` all check
 `timerRef.current?.isSessionActive()` **first**, before any other logic, and alert if no

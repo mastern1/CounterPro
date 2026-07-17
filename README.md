@@ -4,7 +4,7 @@
 
 **CounterPro** is a specialized, high-performance mobile app built for factories to track worker productivity in real time. It replaces manual paper counting with a fast, error-resistant, dark-themed interface designed for the factory floor.
 
-> 🚧 **Project Status:** Active Development (MVP Phase). Offline-first today; cloud sync next.
+> 🚧 **Project Status:** Active Development. Offline-first with **Supabase cloud sync built in**; the web admin dashboard is next.
 
 ---
 
@@ -18,7 +18,8 @@
   - **Custom color** — pick from a calm pastel palette.
 - **⏱️ Session Management** — A built-in session timer (start / pause / resume / stop) with high-accuracy, drift-free timing. Counting is **gated behind an active session**, and the screen is kept awake while a session runs.
 - **🛡️ Exit Guard** — Leaving a screen mid-session prompts to stop & save first, so no session ends silently.
-- **📊 Production Diff** — On session end, the app computes exactly what was produced (added, brand-new, and deleted items) into a structured session record — the payload designed for upcoming cloud upload.
+- **📊 Production Diff** — On session end, the app computes exactly what was produced (added, brand-new, and deleted items) into a structured session record, persisted locally and uploaded to the cloud.
+- **☁️ Cloud Sync (Supabase)** — Devices, groups, counters, and sessions are mirrored to Supabase in the background: live counter updates piggyback the smart save, deletions propagate, and sessions run an active → completed lifecycle. Writes go through `SECURITY DEFINER` RPC functions only — the key embedded in the app can never *read* production data. Sessions that run fully offline are backfilled on the next launch (idempotently — retries can't create duplicates).
 - **⚡ Adaptive UI** — Responsive grid/list layouts with dynamic column sizing (tablet-optimized), large hit targets for fast repetitive tapping, and haptic feedback on every action.
 - **🌙 Dark Theme** — A single, eye-friendly dark interface throughout.
 - **🔌 Offline-First** — Fully functional with no connection. Data is persisted locally with a debounced "smart save" plus a flush when the app goes to the background.
@@ -27,9 +28,10 @@
 
 ## 🗺️ Roadmap
 
-- [ ] **🗃️ Local session logs** — Persist completed/in-progress sessions on device (crash-safe durability).
-- [ ] **☁️ Cloud Sync (Supabase)** — Sync session records to a central database.
-- [ ] **📊 Admin Dashboard** — A web dashboard for managers to monitor production live.
+- [x] **🗃️ Local session logs** — Completed sessions persist on device (and survive logout) until confirmed synced.
+- [x] **☁️ Cloud Sync (Supabase)** — Groups, counters, and session records sync to a central database, with offline backfill.
+- [ ] **📊 Admin Dashboard** — A web dashboard for managers to monitor production live (next up).
+- [ ] **💥 Crash Recovery** — Persist the in-flight session snapshot so an OS kill mid-session can be recovered as an "interrupted" session.
 - [ ] **🔐 Worker Authentication** — Secure sign-in via worker IDs or QR codes.
 - [ ] **📈 Analytics** — Daily/weekly productivity trends and reports.
 
@@ -43,7 +45,7 @@
 | **Runtime**          | React 19 · React Compiler enabled                       |
 | **Navigation**       | React Navigation 7 (Native Stack)                       |
 | **State Management** | React Context API & Hooks                               |
-| **Storage**          | AsyncStorage (local) → Supabase (planned)               |
+| **Storage**          | AsyncStorage (local source of truth) + Supabase (cloud) |
 | **Device & UX**      | expo-haptics · expo-device · expo-keep-awake            |
 | **Language**         | JavaScript (ES6+)                                       |
 | **Styling**          | StyleSheet API with a centralized dark theme            |
@@ -60,9 +62,13 @@ src/
 ├── hooks/           # useSessionManager — session snapshot & production diff
 ├── navigation/      # AppNavigator (native stack)
 ├── screens/         # WorkerIdentity → Home → Dashboard
-├── services/        # storageService — the only AsyncStorage gateway
-└── utils/           # generators & validation helpers
+├── services/        # storageService (only AsyncStorage gateway) · syncService + supabaseClient (only Supabase gateway)
+└── utils/           # generators, validation & session-record helpers
 ```
+
+Backend SQL lives at the repo root: `supabase_schema.sql` (tables + RLS) and
+`supabase_functions.sql` (the `SECURITY DEFINER` write layer — re-run it in the Supabase
+SQL Editor whenever it changes).
 
 ---
 
