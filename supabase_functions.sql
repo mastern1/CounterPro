@@ -96,6 +96,29 @@ begin
                     updated_at = now();
     end loop;
   end loop;
+
+  -- Propagate local deletions: remove this device's rows that are absent
+  -- from the payload. NOT EXISTS (rather than NOT IN) is null-safe and
+  -- handles the empty payload ('[]') naturally: nothing matches, so every
+  -- row for the device is deleted — the "last group deleted" / logout case.
+  -- Counters go first; deleting a group also cascades to its counters via
+  -- the (device_id, group_id) foreign key.
+  delete from counters ctr
+  where ctr.device_id = p_device_id
+    and not exists (
+      select 1
+      from jsonb_array_elements(p_groups) pg,
+           jsonb_array_elements(coalesce(pg->'items', '[]'::jsonb)) pc
+      where pc->>'id' = ctr.id
+    );
+
+  delete from groups grp
+  where grp.device_id = p_device_id
+    and not exists (
+      select 1
+      from jsonb_array_elements(p_groups) pg
+      where pg->>'id' = grp.id
+    );
 end;
 $$;
 

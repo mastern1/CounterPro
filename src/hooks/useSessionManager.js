@@ -7,6 +7,9 @@ export const useSessionManager = (items, groupData, userData) => {
   const initialSnapshot = useRef(null);
   const sessionStartTime = useRef(null);
   const remoteSessionIdRef = useRef(null);
+  // Bumped on every startSession so a slow start_session response can be
+  // recognized as belonging to an old session (see below).
+  const sessionGenerationRef = useRef(0);
 
   const latestItemsRef = useRef(items);
   useEffect(() => {
@@ -21,13 +24,38 @@ export const useSessionManager = (items, groupData, userData) => {
       JSON.stringify(latestItemsRef.current),
     );
 
+    // The uuid may only be kept if THIS session is still the current, active
+    // one when the RPC resolves. Without the guard, a fast stop on a slow
+    // network leaves the remote row 'active' forever and the late uuid lands
+    // in the ref after reset — where the NEXT session's endSession would
+    // complete the wrong row with the wrong data.
+    sessionGenerationRef.current += 1;
+    const generation = sessionGenerationRef.current;
+    remoteSessionIdRef.current = null;
+
     SyncService.startRemoteSession({
       syncDeviceId: userData?.syncDeviceId,
       groupId: groupData?.id,
       workerName: userData?.name,
       startedAt: sessionStartTime.current,
     }).then((remoteSessionId) => {
-      remoteSessionIdRef.current = remoteSessionId;
+      if (!remoteSessionId) return;
+      const isSameSession = generation === sessionGenerationRef.current;
+      const isStillActive = initialSnapshot.current !== null;
+      if (isSameSession && isStillActive) {
+        remoteSessionIdRef.current = remoteSessionId;
+      } else {
+        // This session already ended (or another one started) before the
+        // start RPC resolved. Close the just-created row immediately so it
+        // can't sit as status='active' forever; the real production data
+        // still reaches the server via the unsynced-log retry on launch.
+        SyncService.completeRemoteSession({
+          remoteSessionId,
+          items: { production: [], deletedDuringSession: [] },
+          durationSeconds: 0,
+          endedAt: new Date().toISOString(),
+        });
+      }
     });
   }, [groupData, userData]);
 

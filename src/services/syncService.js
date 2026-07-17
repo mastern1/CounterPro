@@ -25,9 +25,11 @@ export const SyncService = {
     }
   },
 
-  // Mirrors every group + its counter items for this device.
+  // Mirrors every group + its counter items for this device. An empty array
+  // is a valid payload (deleting the last group / logout must propagate so
+  // the server doesn't keep stale rows) — only bail when groups is missing.
   syncGroupsAndCounters: async (syncDeviceId, groups) => {
-    if (!syncDeviceId || !groups || groups.length === 0) return;
+    if (!syncDeviceId || !groups) return;
     try {
       const payload = groups.map((g) => ({
         id: g.id,
