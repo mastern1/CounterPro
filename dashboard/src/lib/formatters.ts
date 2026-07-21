@@ -1,4 +1,4 @@
-export function formatDateTime(isoString) {
+export function formatDateTime(isoString: string | null | undefined): string {
   if (!isoString) return '—'
   return new Date(isoString).toLocaleString('en-GB', {
     timeZone: 'Europe/Istanbul',
@@ -7,7 +7,7 @@ export function formatDateTime(isoString) {
   })
 }
 
-export function formatDuration(totalSeconds) {
+export function formatDuration(totalSeconds: number | null | undefined): string {
   if (totalSeconds == null) return '—'
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)

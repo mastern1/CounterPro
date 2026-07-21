@@ -1,8 +1,8 @@
-# 🏭 CounterPro | Production Tracking System
+# 🏭 Countful | Production Tracking System
 
 ![Status](https://img.shields.io/badge/Status-Active_Development-orange) ![Platform](https://img.shields.io/badge/Platform-iOS_%7C_Android-blue) ![Expo](https://img.shields.io/badge/Built_with-Expo_SDK_57-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![License](https://img.shields.io/badge/License-MIT-green)
 
-**CounterPro** is a specialized, high-performance mobile app built for factories to track worker productivity in real time. It replaces manual paper counting with a fast, error-resistant, dark-themed interface designed for the factory floor.
+**Countful** is a specialized, high-performance mobile app built for factories to track worker productivity in real time. It replaces manual paper counting with a fast, error-resistant, dark-themed interface designed for the factory floor.
 
 > 🚧 **Project Status:** Active Development. Offline-first with **Supabase cloud sync built in**; the web admin dashboard is next.
 
@@ -19,7 +19,7 @@
 - **⏱️ Session Management** — A built-in session timer (start / pause / resume / stop) with high-accuracy, drift-free timing. Counting is **gated behind an active session**, and the screen is kept awake while a session runs.
 - **🛡️ Exit Guard** — Leaving a screen mid-session prompts to stop & save first, so no session ends silently.
 - **📊 Production Diff** — On session end, the app computes exactly what was produced (added, brand-new, and deleted items) into a structured session record, persisted locally and uploaded to the cloud.
-- **☁️ Cloud Sync (Supabase)** — Devices, groups, counters, and sessions are mirrored to Supabase in the background: live counter updates piggyback the smart save, deletions propagate, and sessions run an active → completed lifecycle. Writes go through `SECURITY DEFINER` RPC functions only — the key embedded in the app can never *read* production data. Sessions that run fully offline are backfilled on the next launch (idempotently — retries can't create duplicates).
+- **☁️ Cloud Sync (Supabase)** — Devices, groups, counters, and sessions are mirrored to Supabase in the background: live counter updates piggyback the smart save, deletions propagate, and sessions run an active → completed lifecycle. Writes go through `SECURITY DEFINER` RPC functions only — the key embedded in the app can never _read_ production data. Sessions that run fully offline are backfilled on the next launch (idempotently — retries can't create duplicates).
 - **⚡ Adaptive UI** — Responsive grid/list layouts with dynamic column sizing (tablet-optimized), large hit targets for fast repetitive tapping, and haptic feedback on every action.
 - **🌙 Dark Theme** — A single, eye-friendly dark interface throughout.
 - **🔌 Offline-First** — Fully functional with no connection. Data is persisted locally with a debounced "smart save" plus a flush when the app goes to the background.

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "CounterPro",
-    "slug": "CounterPro",
+    "name": "Countful",
+    "slug": "countful",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "counterpro",
+    "scheme": "countful",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#121212",
     "ios": {
@@ -20,7 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "backgroundColor": "#121212",
-      "package": "com.noursweid98.counterpro"
+      "package": "com.noursweid98.countful"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"

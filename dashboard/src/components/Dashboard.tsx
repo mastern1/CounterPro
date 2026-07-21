@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/context/AuthContext'
 import { formatDateTime, formatDuration } from '@/lib/formatters'
+import { applyChange } from '@/lib/realtimeMerge'
+import type { Tables } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -14,16 +17,26 @@ import {
   TableCell,
 } from '@/components/ui/table'
 
+type Device = Tables<'devices'>
+type Session = Tables<'sessions'>
+type Group = Tables<'groups'>
+type Counter = Tables<'counters'>
+
 const SESSION_LIMIT = 50
+
+const deviceKey = (d: Device) => d.device_id
+const sessionKey = (s: Session) => s.id
+const counterKey = (c: Counter) => `${c.device_id}:${c.id}`
 
 export default function Dashboard() {
   const { signOut } = useAuth()
-  const [devices, setDevices] = useState([])
-  const [sessions, setSessions] = useState([])
-  const [groups, setGroups] = useState([])
-  const [counters, setCounters] = useState([])
+  const [devices, setDevices] = useState<Device[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
+  const [counters, setCounters] = useState<Counter[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [live, setLive] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -66,17 +79,56 @@ export default function Dashboard() {
     }
   }, [])
 
-  const groupName = (deviceId, groupId) =>
+  // Live updates: devices/sessions/counters must have Realtime enabled for
+  // their table in the Supabase dashboard (Database > Replication), or these
+  // events never arrive — RLS still gates who receives them (authenticated only).
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devices' },
+        (payload: RealtimePostgresChangesPayload<Device>) =>
+          setDevices((prev) => applyChange(prev, payload, deviceKey)),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sessions' },
+        (payload: RealtimePostgresChangesPayload<Session>) =>
+          setSessions((prev) => applyChange(prev, payload, sessionKey).slice(0, SESSION_LIMIT)),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'counters' },
+        (payload: RealtimePostgresChangesPayload<Counter>) =>
+          setCounters((prev) => applyChange(prev, payload, counterKey)),
+      )
+      .subscribe((status) => setLive(status === 'SUBSCRIBED'))
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const groupName = (deviceId: string, groupId: string) =>
     groups.find((g) => g.device_id === deviceId && g.id === groupId)?.name ?? groupId
 
-  const workerName = (deviceId) =>
+  const workerName = (deviceId: string) =>
     devices.find((d) => d.device_id === deviceId)?.worker_name ?? deviceId
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">CounterPro Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold">Countful Dashboard</h1>
+            <Badge variant={live ? 'default' : 'outline'} className="gap-1.5">
+              <span
+                className={`size-1.5 rounded-full ${live ? 'bg-primary-foreground' : 'bg-muted-foreground'}`}
+              />
+              {live ? 'Live' : 'Connecting…'}
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground">Live production overview</p>
         </div>
         <Button variant="outline" onClick={signOut}>

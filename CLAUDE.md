@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 productivity. Workers organize production lines into *groups*, each containing *counter
 items* they tap to increment during timed work *sessions*. AsyncStorage is the local
 source of truth; on top of it, completed data is mirrored to **Supabase** (implemented —
-see "Cloud sync" below). A **web admin dashboard** that reads the Supabase data (live
-device/session monitoring, monthly production summaries, Excel export) is the next
-roadmap item — not yet built.
+see "Cloud sync" below). A **web admin dashboard** that reads the Supabase data lives in
+`/dashboard` as a separate app within this repo (own `package.json`/tooling) — see "Web
+dashboard" below. Live device/session/production monitoring is built; monthly production
+summaries and Excel export are still roadmap.
 
 ## Commands
 
@@ -244,3 +245,54 @@ work around Android column glitches — keep that pattern.
   copy there rather than hardcoding.
 - Name validation / duplicate checks: `src/utils/validation.js`
   (`checkDuplicateName`, `validateStep`).
+
+## Web dashboard (`/dashboard`)
+
+A separate Vite + React 19 + TypeScript app, **not** part of the Expo project — its own
+`package.json`, `node_modules`, and `npm install`/`npm run dev`/`npm run build` (run from
+inside `/dashboard`, not the repo root). Stack: Tailwind v4 (`@tailwindcss/vite`) +
+shadcn/ui (`components.json` has `"tsx": true` — always add new primitives via
+`npx shadcn add <name>`, don't hand-write them, or they won't match the project's typed
+component conventions). Dark-only, no toggle, same reasoning as the mobile app.
+
+**Auth is a single Supabase Auth admin account** (email/password created directly in the
+Supabase dashboard, Authentication → Users) — there is no self-serve signup and the app
+assumes exactly one legitimate login. `src/context/AuthContext.tsx` wraps
+`supabase.auth.signInWithPassword` / `onAuthStateChange`. No new backend writes were
+needed for this: the existing `supabase_schema.sql` already grants `authenticated` SELECT
+on all four tables (see Cloud sync above), so the dashboard reads
+via plain `supabase.from(table).select()` once logged in — RLS gates it automatically.
+
+**`src/lib/supabaseClient.ts` is typed** via `createClient<Database>(...)`, where
+`Database` (`src/types/database.ts`) is **hand-written**, not CLI-generated — there's no
+`supabase login` access token available in this environment. It mirrors the exact shape
+`supabase gen types typescript --project-id hawqnpjwtpegahgehndo` would produce, so
+running that command and overwriting the file is a safe drop-in upgrade whenever CLI
+access exists. Columns were sourced from `supabase_functions.sql`'s INSERT/UPDATE
+statements, **not** `supabase_schema.sql` — the schema file is not guaranteed to reflect
+the live cloud database (it's a partial/patch file, not a from-scratch dump), while the
+functions file's literal column references are what's actually running. If the two ever
+disagree, trust the live database (verify via a real query), not either file blindly.
+
+**Realtime** (`Dashboard.tsx`) subscribes to `postgres_changes` on `devices`, `sessions`,
+and `counters` (deliberately not `groups` — it rarely changes and isn't displayed on its
+own). This requires each table to have Realtime enabled in the Supabase dashboard
+(Database → Replication / Table Editor toggle) — without that, the subscription connects
+but silently never receives events. `postgres_changes` (not Broadcast) is the correct
+choice here specifically because there's exactly one admin viewer; Broadcast only wins
+past ~3,000 concurrent subscribers or high-frequency events (cursors, typing indicators),
+neither of which applies. `src/lib/realtimeMerge.ts`'s `applyChange` keys DELETE events
+off primary-key fields only (`device_id` / `id` / `device_id:id`) — this works with the
+default `REPLICA IDENTITY`, no `ALTER TABLE ... REPLICA IDENTITY FULL` needed, because
+RLS-gated tables only send PK columns on a deleted row's old-record payload anyway.
+
+**React Compiler is enabled — but not the way you'd expect.** Plain
+`babel({ plugins: ['babel-plugin-react-compiler'] })` in `vite.config.ts` **silently
+no-ops** under this project's Vite 8 / Rolldown pipeline: the build succeeds and the
+output is byte-identical to no-compiler, with no error. The working integration is
+`@vitejs/plugin-react`'s exported `reactCompilerPreset()` passed into
+`@rolldown/plugin-babel`'s `presets` option (see `vite.config.ts`). If you ever touch
+this config, verify the compiler is actually running by grepping the **built** bundle for
+`memo_cache_sentinel` (the compiler's cache-check marker) — a clean build alone proves
+nothing. No manual `useMemo`/`useCallback`/`React.memo` is used in this app; let the
+compiler handle it.

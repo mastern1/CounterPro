@@ -1,10 +1,18 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
 
-const AuthContext = createContext(null)
+interface AuthContextValue {
+  session: Session | null
+  loading: boolean
+  signIn: (email: string, password: string) => ReturnType<typeof supabase.auth.signInWithPassword>
+  signOut: () => ReturnType<typeof supabase.auth.signOut>
+}
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,7 +28,7 @@ export function AuthProvider({ children }) {
     return () => subscription.subscription.unsubscribe()
   }, [])
 
-  const signIn = (email, password) =>
+  const signIn = (email: string, password: string) =>
     supabase.auth.signInWithPassword({ email, password })
 
   const signOut = () => supabase.auth.signOut()
